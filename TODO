@@ -67,15 +67,18 @@
 			, custom: {useUnicode:true,characterEncoding:'UTF-8'} // a struct that contains type specific settings
 		};
 
+
 - embedded db's
 		deploy to them
 		switch to SQL (via ORM)
+
 
 - apps
 		static data
 		routes
 		css
 		components
+
 		
 - application load stuff
 		components as global (coldmvc.x etc)
