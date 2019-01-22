@@ -1,81 +1,113 @@
-# ColdMVC
+myst 
+====
 
-## Summary
+Summary
+-------
 
-ColdMVC is a web framework for ColdFusion and Lucee application servers.   It is supposed to facilitate development via MVC within CFML applications and make it trivial to enforce "seperation of concerns".  
+Myst is a web framework for CFML based webservers such as ColdFusion and Lucee.
+The intent is to facilitate MVC-based web development for CFML applications,
+making it trivial to enforce "seperation of concerns" and create maintainable
+CFML codebases.
 
 
+Installation
+------------
 
-## Installation
+Myst can be downloaded via its <a href="http://mystframework.com">home page</a>
+or via Github at <a href="https://github.com/tubularmodular/myst">https://github.com/tubularmodular/myst</a>.  You can clone the latest version by using the following on your system:
 
-ColdMVC can be downloaded via its <a href="http://ramarcollins.com/coldmvc">homesite</a> or via Github.  You can clone the latest version by using the following on your system:
-
-1. <pre>
-	 git clone https://github.com/zaiah-dj/coldmvc.git
+1. If you are on Linux, go to your home directory and grab the latest copy.
+	<pre>
+	$ cd ~
+	$ git clone https://github.com/tubularmodular/myst.git
+	</pre>
+	
+	If you do not have git installed, you may also download directly from the home page. 
+	<pre>
+	$ cd ~
+	$ wget -O myst.tar.gz http://mystframework.com/assets/myst-v0.2.tar.gz
+	$ tar xzf myst.tar.gz
 	</pre>
 
-2. <pre>
-	cd coldmvc
-	make install # You'll probably need to be root
+2. Now, we can install Myst and it's accompanying files. 
+	<pre>
+	$ cd myst 
+	$ make install    # You'll probably need to be root
 	</pre>
 
-Although this tooling does not require a server, it should go without saying
-that ColdMVC will require either ColdFusion or Lucee to work correctly.  If you are totally new to ColdFusion and/or Lucee, you will want to get a copy and install it on your system.  I would surmise the easiest way to get going is to start with Lucee's express build.
-It needs no special rights to run on your system and can be downloaded <a href="http://download.lucee.org/?type=releases">here</a>. 
+	If you decide that you don't like Myst or run into some sort of configuration
+	problem, you can delete the installed files by running:
+	<pre>
+	$ make uninstall  # NOTE: You'll probably need to be root again
+	</pre>
+
+3. Myst has been heavily tested with Tomcat and Apache and running it with either
+	 of those servers will yield the best results.  If you do not have Apache
+	already running on your system, it will be easiest to use Lucee's built-in
+	Tomcat server.  The following commands will install Myst in your system's /opt 
+	directory.
+	<pre>
+	# Output of this command will let you know that Myst was installed and is in your $PATH
+	$ myst -h         
+	$ mystinstall --full-install --prefix /opt/myst --user http
+	</pre>
 
 
-## Builds On
-ColdMVC is administered via shell script right now, and has been tested on Linux, OSX and Cygwin.   A detailed list of the versions tested follow.   Windows users will need either <a href="https://git-for-windows.github.io">Git Bash</a> or <a href="https://www.cygwin.com">Cygwin</a> to run the tooling at the moment. 
+### Builds On
 
-<ul>
-<li>
-	Linux
-	<ul>
-		<li>Debian 8</li>
-		<li>Ubuntu 16</li>
-		<li>Fedora</li>
-	</ul>
-</li>
-<li>
-	OSX	
-	<ul>
-		<li>Sierra</li>
-		<li>High Sierra</li>
-	</ul>
-</li>
-</ul>
- 
+Myst is administered via shell script right now, and has been tested most
+heavily on different distributions of Linux.  I plan to resume Apple OS, 
+Cygwin and Windows 10 testing in the next two months.   However, this also means
+that Linux users will have the best results with this application for a little
+while.
+<!-- Windows users will need either <a
+href="https://git-for-windows.github.io">Git Bash</a> or <a
+href="https://www.cygwin.com">Cygwin</a> to run the tooling at the moment.  
+-->
 
 
-## Setting up New Projects
+Setting up your first Myst project
+----------------------------------
 
-New projects can be setup using a command line similar to the the following.
-<pre>
-coldmvc --create --folder /path/to/coldfusion/webroot/path-of-site -n 'site-name'
-</pre>
+### Introduction
 
-This is the absolute smallest set of options needed to create an instance of a
-ColdMVC site on your system. 
+For the purposes of this quick walkthrough, let's assume we want to create a
+quick image gallery.  We're going to call it 'frogLookup'.
 
-Notice that you will need to specify the <i>absolute</i> path to where your Lucee or ColdFusion webroot, then append the name of the directory that will hold your web files.  (This will change in the future, do not worry.)  'site-name' is the symbolic name of your site, but will also be used as the title and domain name of the site if those flags are not specified.   After the command runs successfully, you should be able to visit a link that looks like the following (provided you have not changed the Lucee or ColdFusion default port number): 
-<a href="http://localhost:8888/site-name">http://localhost:8888/site-name</a>
 
-You should see something similar to the following screenshots. 
+### With Embedded Tomcat
+
+1. New projects can be setup with a one-line command sequence similar to the the following.
+	<pre>
+	myst --name 'frogLookup' --basedir froglookup --create --folder /path/to/coldfusion/webroot/path-of-site -n 'site-name'
+	</pre>
+
+	Notice that you will need to specify the <i>absolute</i> path to where your Lucee or ColdFusion webroot, then append the name of the directory that will hold your web files.  
+	'site-name' is the symbolic name of your site, but will also be used as the title and domain name of the site if those flags are not specified.   
+	After the command runs successfully, you should be able to visit a link that looks like the following (provided you have not changed the Lucee or ColdFusion default port number): 
+	<a href="http://localhost:8888/froglookup">http://localhost:8888/froglookup</a>
+
+2. At successful completion of this step your browser should look similar to the following screenshots:
 <img style="margin: 0 auto" src="img/first-page-400x400.png" />
 <img style="margin: 0 auto" src="img/second-page-400x400.png" />
 
-Or if you were unfortunate, you will see an exception with a big, fat 500 error message.  If something like this occurs, please contact me via ramar dot collins at gmail dot com, and I'll try to help you through the error.
+<!--
+	<a href="mailto:rc@tubularmodular.com?subject=Myst Setup Failed">Help!  I didn't see these images.</a>
+-->
+
+### With Apache 
+
+....
 
 
 
+Comprehensive Documentation
+---------------------------
 
-## Additional Documentation
+This README is only intended as a small demonstration of how you can get running
+with Myst.   More comprehensive documentation can be found via the homepage at 
+<a href="http://mystframework.com">http://mystframework.com</a>
 
-Additional documentation can be found via <a href="http://ramarcollins.com/coldmvc">this link</a>
-
-
-## Notes
 
 
 <link href="style.css" rel="stylesheet">
-
