@@ -1781,11 +1781,6 @@ component name="Myst" accessors=true {
 		}
 
 		//Check that JSON manifest contains everything necessary.
-		var keys = { 
-			_required = [ "base", "routes" ] 
-		 ,_optional = [ "addLogLine", "verboseLog", "logLocation" ]
-		};
-
 		for ( var key in [ "base", "routes" ] ) {
 			if ( !StructKeyExists( appdata, key  ) ) {
 				renderPage( status=500, content="Struct key '"& key &"' not found in data.cfm.", err={} );

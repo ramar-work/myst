@@ -70,4 +70,33 @@ testinit:
 		printf '' >/dev/null
 
 
+# otn - Switches sites that were previously running coldmvc.cfc as their
+# engine to myst.cfc
+otn: DIR=
+otn:
+	@test ! -z "$(DIR)" || printf "No directory specified for engine update.  (Try make -e DIR=/path/to/dir)\n" > /dev/stderr
+	test ! -z "$(DIR)"
+	@test -d "$(DIR)" || printf "The directory '$(DIR)' doesn't exist or isn't accessible.\n" > /dev/stderr 
+	test -d "$(DIR)"
+	mv $(DIR)/data.cfm $(DIR)/data_.cfm
+	mv $(DIR)/index.cfm $(DIR)/index_.cfm
+	mv $(DIR)/coldmvc.cfc $(DIR)/coldmvc_.cfc
+	find $(DIR)/ -maxdepth 2 -type f -name Application.cfc | xargs -IFF sh -c 'BB=FF; mv FF $${BB%%.*};'
+	for n in app components db files log setup std sql views; do \
+		cp share/Application-Redirect.cfc $(DIR)/$$n/Application.cfc; done
+	cp share/Application.cfc $(DIR)/
+	cp share/index.cfm $(DIR)/
+	cp myst.cfc $(DIR)/
+	cp -r share/components/ $(DIR)/std/
+	test -d $(DIR)/middleware/ && rm -rf $(DIR)/middleware/
+	sed 's/master-post/post/' $(DIR)/data_.cfm > $(DIR)/data.cfm 
+
+# get rid of all the old crap that's been fixed up
+otndel: DIR=
+otndel:
+	find $(DIR)/ -maxdepth 2 -type f -name "*_.cfm" -o -name "*_.cfc"	| xargs rm -f
+
+otn-rollback:
+	printf ''	
+
 #endif
