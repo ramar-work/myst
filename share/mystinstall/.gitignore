@@ -1,0 +1,4 @@
+# ignore all that's here
+mod_cfml
+chroot
+tmp/

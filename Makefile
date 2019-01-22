@@ -5,7 +5,7 @@ MANDIR = ${PREFIX}/share/man
 BINDIR = $(PREFIX)/bin
 CONFIG = /etc
 WILDCARD=*
-NAME=coldmvc
+NAME=myst
 
 
 # list - List all the targets and what they do
@@ -13,21 +13,23 @@ list:
 	@printf 'Available options are:\n'
 	@sed -n '/^#/ { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
 
-# install - Install the ColdMVC package on a new system
+# install - Install the myst package on a new system
 install:
 	-test -d $(PREFIX) || mkdir -p $(PREFIX)/{share,share/man,bin}/
-	-mkdir -p $(PREFIX)/share/$(NAME)/
-	-cp ./$(NAME) $(PREFIX)/bin/$(NAME)
+	-mkdir -pv $(PREFIX)/share/$(NAME)/
+	-cp -r ./bin/$(WILDCARD) $(PREFIX)/bin/
 	-cp -r ./share/$(WILDCARD) $(PREFIX)/share/$(NAME)/
 	-cp ./$(NAME).cfc $(PREFIX)/share/$(NAME)/
 	-cp ./etc/$(NAME).conf $(CONFIG)/
 	-sed -i 's;__PREFIX__;$(PREFIX);' $(CONFIG)/$(NAME).conf 
 
-# uninstall - Uninstall the ColdMVC package on a new system
+# uninstall - Uninstall the myst package on a new system
 uninstall:
 	-rm -f $(PREFIX)/bin/$(NAME)
 	-rm -f $(CONFIG)/$(NAME).conf
 	-rm -rf $(PREFIX)/share/$(NAME)/
+	-systemctl disable lucee
+	-rm -f /usr/lib/systemd/system/lucee.service
 
 #if 0 
 # usermake - Create a modified Makefile for regular users

@@ -20,6 +20,6 @@ new ColdMVC applications.
  * ---------------------------------------------- */
   --->
 <cfscript>
-	coldmvc = createObject("component", "coldmvc").init({});
+	coldmvc = createObject("component", "myst").init({});
 	coldmvc.make_index(coldmvc);
 </cfscript>

@@ -49,9 +49,9 @@ manifest = {
 	,"addLogLine" = 0
 }
 
-/*----------------- DEPRECATED / UNUSED ---------------------*/
-/*This was used to run something after every request*/
-,"master-post" = false
+/*This is used to run something after every request (onRequest could be used as
+ *well)*/
+,"post" = false
 
 /*This was used to choose custom 404 and 500 error pages*/
 ,"localOverride" = {

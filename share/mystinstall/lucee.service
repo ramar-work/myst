@@ -1,0 +1,16 @@
+# lucee service
+[Unit]
+Description="Lucee CFML server"
+#After=network.target
+#After=syslog.target
+
+[Service]
+ExecStart=__LUCEE_DIR__/lucee_ctl start
+ExecStop=__LUCEE_DIR__/lucee_ctl stop
+ExecReload=__LUCEE_DIR__/lucee_ctl restart 
+Type=forking
+#User=__LUCEE_USER__
+#Group=__LUCEE_GROUP__
+
+[Install]
+WantedBy=multi-user.target

@@ -1,31 +1,28 @@
 <cfscript>
 /* --------------------------------------------------
 coldmvc.cfc
------------
+===========
+
 Author
-=======
+-----
 Antonio R. Collins II (rc@tubularmodular.com, ramar.collins@gmail.com)
 
 Copyright
 ---------
-
-	Copyright 2016-Present, "Tubular Modular"
-	Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+Copyright 2016-Present, "Tubular Modular"
+Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 
 Summary
 -------
-
-	An MVC like structure for handling ColdFusion pages.
+An MVC like structure for handling ColdFusion pages.
 
 Usage
 -----
-
-	Drop this file into your application's web root and
-	call it using index.cfm or Application.cfc.
+Drop this file into your application's web root and
+call it using index.cfm or Application.cfc.
 
 TODO
 ----
-
 	- Add a 'test' directory for tests
 		In this folder have tests for functions
 		Have another folder for mock views and apps
@@ -212,9 +209,79 @@ component name = "ColdMVC" {
 	};
 
 
-	//<<DOC
+	//Courtesy of https://httpstatuses.com/	
+	this.httpHeaders = {
+		//1×× Informational
+		 "100" = "Continue"
+		,"101" = "Switching Protocols"
+		,"102" = "Processing"
+		//2×× Success
+		,"200" = "OK"
+		,"201" = "Created"
+		,"202" = "Accepted"
+		,"203" = "Non-authoritative Information"
+		,"204" = "No Content"
+		,"205" = "Reset Content"
+		,"206" = "Partial Content"
+		,"207" = "Multi-Status"
+		,"208" = "Already Reported"
+		,"226" = "IM Used"
+		//3×× Redirection
+		,"300" = "Multiple Choices"
+		,"301" = "Moved Permanently"
+		,"302" = "Found"
+		,"303" = "See Other"
+		,"304" = "Not Modified"
+		,"305" = "Use Proxy"
+		,"307" = "Temporary Redirect"
+		,"308" = "Permanent Redirect"
+		//4×× Client Error
+		,"400" = "Bad Request"
+		,"401" = "Unauthorized"
+		,"402" = "Payment Required"
+		,"403" = "Forbidden"
+		,"404" = "Not Found"
+		,"405" = "Method Not Allowed"
+		,"406" = "Not Acceptable"
+		,"407" = "Proxy Authentication Required"
+		,"408" = "Request Timeout"
+		,"409" = "Conflict"
+		,"410" = "Gone"
+		,"411" = "Length Required"
+		,"412" = "Precondition Failed"
+		,"413" = "Payload Too Large"
+		,"414" = "Request-URI Too Long"
+		,"415" = "Unsupported Media Type"
+		,"416" = "Requested Range Not Satisfiable"
+		,"417" = "Expectation Failed"
+		,"418" = "I'm a teapot"
+		,"421" = "Misdirected Request"
+		,"422" = "Unprocessable Entity"
+		,"423" = "Locked"
+		,"424" = "Failed Dependency"
+		,"426" = "Upgrade Required"
+		,"428" = "Precondition Required"
+		,"429" = "Too Many Requests"
+		,"431" = "Request Header Fields Too Large"
+		,"444" = "Connection Closed Without Response"
+		,"451" = "Unavailable For Legal Reasons"
+		,"499" = "Client Closed Request"
+		//5×× Server Error
+		,"500" = "Internal Server Error"
+		,"501" = "Not Implemented"
+		,"502" = "Bad Gateway"
+		,"503" = "Service Unavailable"
+		,"504" = "Gateway Timeout"
+		,"505" = "HTTP Version Not Supported"
+		,"506" = "Variant Also Negotiates"
+		,"507" = "Insufficient Storage"
+		,"508" = "Loop Detected"
+		,"510" = "Not Extended"
+		,"511" = "Network Authentication Required"
+		,"599" = "Network Connect Timeout Error"
+	}
+
 	//List of mimetypes for file processing
-	//DOC
 	this.mimes = {
 		 "text/html" = "html", "html" = "text/html"
 		,"text/html" = "htm", "htm" = "text/html"
@@ -400,44 +467,155 @@ component name = "ColdMVC" {
 	}
 
 
+	//This one includes pages in paths
+	private function pageHandler ( 
+		Required content
+	, Required String pagePath 
+	, Required String returnHref
+	, Required Numeric status
+	) 
+	{
+		/*
+		var r = getPageContext().getResponse();
+		var w = r.getWriter();
+		r.setContentType( "text/html" );
+		w.print( arguments.content );
+		r.flush();
+		*/
+	}
+
+
+	//This one just outputs content 
+	private function contentHandler ( Required mime, Required content ) {
+		var r = getPageContext().getResponse();
+		var w = r.getWriter();
+		r.setContentType( "text/html" );
+		w.print( arguments.content );
+		r.flush();
+	} 
+
+
+	//This one handles errors in a somewhat standard way, and uses a struct to
+	//more accurately control output
+	private function errorHandler ( Required mime, Required status, Required content, Struct errors ) {
+
+		//Define a standard general useless error,
+		//Just passing an exception without formatting is pretty useful...
+		//And obviously, I want to be able to take things like stack traces out of
+		//the mix...
+
+		//Handle errors of different exception types
+		if ( !StructKeyExists( errors, "type" ) )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Application" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Database" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Template" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "MissingInclude" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Object" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Expression" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Security" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Lock" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else if ( errors.type eq "Any" )
+			errorContent = "An '#errors.type#' error has occurred.";
+		else {
+			errorContent = "An '#errors.type#' error has occurred.";
+		}
+
+		//Packaging the full custom error will have happened in the above steps
+
+		//Page errors are somewhat simple to do, an "error" object that
+		//can be cast to string isn't as obvious, but will come in handy
+		//especially depending on special content types (xml, json, msgpack, etc)
+
+		//Send the request (which should be via another function)
+		var r = getPageContext().getResponse();
+		var w = r.getWriter();
+		r.setContentType( "text/html" );
+		w.print( 
+			"<h2>#arguments.content#</h2>" &
+			errorContent
+		);
+		r.flush();
+	}
+
+
+
 
 	//@title: render_page
 	//@args :
 	//	Hash function for text strings
 	private function render_page ( 
-		Required String   errorMsg  ,  //Error message
+		String   errorMsg  ,  //Error message
 		/*Optional*/ String   errorAddl ,  //Additional error message
-		/*Optional*/ Numeric  status    ,  //Status
-		/*Optional*/ Boolean  iabort    ,  //Abort after rendered page
-		/*Optional*/ String   content   ,  //Add content
-		/*Optional*/ stackTrace   //Include a stacktrace
+		/*Optional*/ stackTrace,  //Include a stacktrace
+
+
+		Numeric status, Struct errors, content, Boolean abort
 	 )
 	{
-		err = {};
-		a = arguments;
-		b = 0;
+		//Define some locally scoped variables 
+		var err = {};
+		var a = arguments;
+		var b = 0;
+		var page;
+
+		//Why would this happen?
 		if ( !isDefined( "appdata" ) )
 			b = false;
 		else {
 			b = check_deep_key( appdata, "routes", rname, "content-type" );
 		}
-		v = "std/" & ((b) ? "mime" : "html") & "-view.cfm";
 
-		//Include pages like normal if status is there...
-		if ( !StructKeyExists( a, "status" ) )
-			include v; 
-		else {
-			if ( status eq 404 ) {
-				status_code = a.status; 
-				status_message = "Page Not Found";
-				include "std/4xx-view.cfm";
+		//These templates are loaded to control output.
+		page = "std/" & ((b) ? "mime" : "html") & "-view.cfm";
+
+//writedump( arguments );
+		//this can be content-less
+		if ( !arguments.status || arguments.status == 200 )
+//			contentHandler( mime="text/html", content=arguments.content ); 	
+abort;
+
+		else if ( arguments.status > 399 && !StructIsEmpty( arguments.errors ) ) { 
+//writedump( arguments ); 
+			//choose between page and content writer here
+			if ( 1 ) {
+				errorHandler( mime="text/html", status=arguments.status,
+					content='something awful', errors=arguments.errors );
+abort;
 			}
 			else {
-				status_code = a.status;
-				status_message = "Internal Server Error";
-				errorLong = ( StructKeyExists( a, "errorAddl" ) ) ? a.errorAddl : "";
-				exception = ( StructKeyExists( a, "stackTrace" ) ) ? a.stackTrace : "";
-				include "std/5xx-view.cfm";
+				0;
+			}
+		}
+		else {
+			//we should never get here, but handle it anyway
+			errorHandler( 
+				mime="text/html", 
+				status=500,
+				content="render_page caller error...",
+				extraContent=[
+					"Check the 'status' key supplied to the method and " & 
+					"ensure that a valid HTTP Status is used." 
+				]
+			);
+		}
+
+		//Jump and die
+		if ( StructKeyExists( arguments, "abort" ) && arguments.abort eq true ) {
+			abort;
+		}
+		else {
+			return {
+				status = true
+			 ,message = "SUCCESS"
 			}
 		}
 	}
@@ -447,8 +625,7 @@ component name = "ColdMVC" {
 	//@title: logReport 
 	//@args :
 	//	Will silently log as ColdMVC executes
-	private function logReport (Required String message) 
-	{
+	private function logReport (Required String message) {
 		/*
 		//Throw an error to get access to the exception 
 		line=0; file="";
@@ -481,7 +658,7 @@ component name = "ColdMVC" {
 			return { status = false, type = false, value = {} };
 
 		//Get the type name
-		typename = getMetadata( sarg[key] ).getName(); 
+		var typename = getMetadata( sarg[key] ).getName(); 
 
 		//Check if the view is a string, an array or an object (except if it's neither) 
 		if ( Find( "String", typename ) ) 
@@ -519,10 +696,10 @@ component name = "ColdMVC" {
 	//	Create "breadcrumb" link for really deep pages within a webapp. 
 	public function crumbs () 
 	{
-		a = ListToArray(cgi.path_info, "/");
+		var a = ListToArray(cgi.path_info, "/");
 		writedump (a);
 		/*Retrieve, list and something else needs breadcrumbs*/
-		for (i = ArrayLen(a); i>1; i--) 
+		for (var i = ArrayLen(a); i>1; i--) 
 		{
 			/*If it's a retrieve page, have it jump back to the category*/
 			writedump(a[i]);
@@ -537,13 +714,13 @@ component name = "ColdMVC" {
 	public Struct function upload_file (String formField, String mimetype) 
 	{
 		//Create a file name on the fly.
-		fp = this.constantmap["/files"]; 
+		var fp = this.constantmap["/files"]; 
 		fp = ToString(Left(fp, Len(fp) - 1)); 
 		
 		//Upload it.
 		try 
 		{	
-			a = FileUpload(
+			var a = FileUpload(
 				fp,           /*destination*/
 				formField,    /*Element from form to write*/
 				mimetype,     /*No mimetype limit*/
@@ -582,29 +759,57 @@ component name = "ColdMVC" {
 	//@title: _include 
 	//@args :
 	//	A better includer
-	public function _include (
-		Required String where,  Required String name ) 
-	{
-		//Search through each type to make sure that it's really a valid application endpoint
-		match = false;	
-		for (x in this.arrayconstantmap)
-			if (x == where) match = true;
+	private function _include ( Required String where, Required String name ) {
+		//Define some variables important to this function
+		var match = false;
+		var ref;
 
-		//Die with a 500 error if nothing was found.	
-		if (!match) 
-		{
-			render_page(
-				status_line = 0,
-				status   = 500, 
-				abort    = true, 
-				errorMsg = ToString("A function requested the page " & name & " in the folder " & 
-					this.root_dir & where & ", but that folder does not exist or is not readable by the server user.")
-			);
-			abort;
+		//Search for a valid path within our framework	
+		for ( var x in this.arrayconstantmap ) {
+			if ( x == where ) { 
+				match = true;
+				break;
+			}
 		}
 
+		//Return a status of false and a full message if the file was not found.
+		if ( !match ) {
+			return {
+				status = false
+			, message = "Requested inclusion of a file not in the web directory."
+			, errors = {}
+			, ref = ""
+			};
+		}
+
+		//Set ref here, I'm not sure about scope.
+		ref = ToString(where & this.pathsep & name & ".cfm");
+		
 		//Include the page and make it work
-		include ToString(where & this.pathsep & name & ".cfm");
+		try {
+			include ref; 
+		}
+		catch (any e) {
+			//define the type of exception here and wrap that.  or just return it and
+			//wrap it from the calling function
+			//writeoutput( e.type );	
+			//writedump( e );
+			//abort;
+
+			return {
+				status = false
+			 ,message = "ColdMVC caught a '#e.type#' exception."
+			 ,errors = e
+			 ,ref = ref 
+			}
+		}
+
+		return {
+			status = true
+		 ,message = "SUCCESS"
+		 ,errors = {}
+		 ,ref = ref 
+		}
 	}
 
 
@@ -646,14 +851,19 @@ component name = "ColdMVC" {
 	//@title: dump_routes 
 	//@args :
 	//	Dump all routes
-	public String function dump_routes ( )
-	{
-		savecontent variable="cms.routeInfo" 
-		{ _include ( "std", "dump-view" ); }
+	public String function dump_routes ( ) {
+		savecontent variable="cms.routeInfo" {
+			_include ( "std", "dump-view" ); 
+		}
 		return cms.routeInfo;
 	}
 
 
+
+	private function dprint( v ) {
+		writedump( v );
+		abort;
+	}
 
 
 	//@title: check_file 
@@ -769,18 +979,17 @@ component name = "ColdMVC" {
 	//@title: make_index 
 	//@args :
 	//	Generate an index
-	public function make_index (ColdMVC ColdMVCInstance) 
-	{
+	public function make_index (ColdMVC ColdMVCInstance) {
 		//Use global scope for now.  This will be fixed later on.
 		variables.coldmvc = ColdMVCInstance;
-		variables.model   = StructNew();
 		variables.data    = ColdMVCInstance.app;
-		variables.db      = ColdMVCInstance.app.data;
+		//variables.db      = ColdMVCInstance.app.data;
+		var oScope;
+		var nScope;
 
-
+		
 		//Find the right resource.
-		try 
-		{
+		try {
 			//Add more to logging
 			logReport("Evaluating URL route");
 
@@ -788,37 +997,14 @@ component name = "ColdMVC" {
 			//ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
 
 			//Set some short names in case we need to access the page name for routing purposes
-			variables.data.loaded = 
-				variables.data.page = 
-											rname = resourceIndex(name=cgi.script_name, ResourceList=appdata);
-											//rname = resourceIndex(name=ses_path, ResourceList=appdata);
+			variables.data.loaded = variables.data.page = 
+				rname = resourceIndex(name=cgi.script_name, ResList=appdata);
+			//rname = resourceIndex(name=ses_path, ResourceList=appdata);
 
 			//Send a 404 page and be done if this resource was not found.
-			if (rname eq "0") 
-			{
+			if (rname eq "0") {
 				render_page(status=404, errorMsg=ToString("Page not found."));
-				writedump( variables );
 				abort;
-			}
-
-			//Load CSS, Javascript and maybe some other stuff once at the beginning
-			assets = DeserializeJSON('{
-				"js": "\t<script type=text/javascript src=MAGIC></script>\n",
-				"css": "\t<link rel=stylesheet type=text/css href=MAGIC />\n"
-			}'); 
-
-			//Loop through the data structure above and make things pretty 
-			for (key in assets) 
-			{
-				if (StructKeyExists(appdata, key) && ArrayLen(appdata[key]) > 0) 
-				{
-					appdata[ToString("rendered_" & key)] = "";
-					for (i=1; i<=ArrayLen(appdata[key]); i++) 
-					{
-						ren = (Left(appdata[key][i], 1) == '/') ? appdata.base & appdata[key][i] : appdata[key][i];
-						appdata[ToString("rendered_" & key)] &= Replace(assets[key], "MAGIC", ren);
-					}
-				}
 			}
 
 			logReport( "Success" );
@@ -834,37 +1020,30 @@ component name = "ColdMVC" {
 			abort;
 		}
 
-		
-		//Evaluate the resource in the 'models/' directory or die trying.
-		try 
-		{
-			logReport( "Evaluating URL resource");
-			addlError = "";
+	
+		//Evaluate resources in the 'models/' directory and get a snapshot of the
+		//variables scope. 
+		try {
+			logReport( "Evaluating models..." );
+			oScope = ListSort( StructKeyList( variables ), "textNoCase" );
+			var callStat=0; 
+			var pageArray=0;
+			var ev;
 
 			//Find an alternate route model first.
-			if (check_deep_key(appdata, "routes", rname, "model")) 
-			{
+			if ( check_deep_key(appdata, "routes", rname, "model") ) {
 				logReport("Evaluate alternative mapped to route name.");
 
 				//Get the type name
 				ev = checkArrayOrString( appdata.routes[rname], "model" );
 
-				//Set additional error and serve the page depending on type
-				if ( ev.type == "string" )
-				{
-					addlError = "The file titled '" & ev.value & ".cfm' does not exist in app/";
-					_include ( where = "app", name = ev.value );
-				}
-				else if ( ev.type == "array" )
-				{
-					for ( x in ev.value ) 
-					{
-						addlError = "The file titled '" & x & ".cfm' does not exist in app/";
-						_include( where ="app", name = x );
-					}
-				}
-				else if ( ev.type == "struct" )
-				{
+				//Stop first if struct models are requested 
+				//if ( ev.type == "struct" )
+				if ( ev.type != "string" && ev.type != "array" )
+					render_page( status=500, abort=true, errors={} );
+
+	/*
+				if ( ev.type == "struct" ) {
 					render_page( 
 						status = 500,
 						abort  = true,
@@ -874,29 +1053,52 @@ component name = "ColdMVC" {
 					);
 					abort;
 				}
+	*/
+				//Set pageArray if it's string or array
+				pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
+
+				//Now load each model, should probably put these in a scope
+				for ( var x in ev.value ) {
+					callStat = _include( where="app", name=x );
+					if ( !callStat.status ) {
+						//plog( ... )
+						render_page( status=500, abort=true, errors=callStat.errors );
+					}
+				}
 			}
+
 			//Match routes following the convention { "x": {} }
-			else if (check_deep_key(appdata, "routes", rname) && StructIsEmpty(appdata.routes[rname]))
-			{
+			else if (check_deep_key(appdata, "routes", rname) && StructIsEmpty(appdata.routes[rname])) {
 				plog( "Evaluate route name." );
-				addlError = "The file titled '" & rname & ".cfm' does not exist in app/.";
-				_include (where = "app", name = rname); 
+				callStat = _include( where="app", name=rname ); 
+				if ( !callStat.status ) {
+					//plog( ... )
+					render_page( status=500, abort=true, errors=callStat.errors );
+				}
 			}
 		
 			//Match the default route	
-			else 
-			{
+			else {
 				//Check that coldmvc.default() has been defined
-				if ( plog( "Evaluating this.default()" ) && structKeyExists(this, "default") )
+				if ( structKeyExists(this, "default") ) {
+					plog( "Evaluating this.default()" );
 					this.default();
-				else if ( plog( "Evaluating app/default.cfm" ) && check_file("app", "default") )
-					_include (where = "app", name = "default"); 
-				else 
-				{
-					render_page(status=500, errorMsg="<p>One of two situations have happened.  " & 
+				}
+				else if ( check_file("app", "default") ) {
+					plog( "Evaluating app/default.cfm" ); 
+					callStat = _include( where="app", name="default" ); 
+					if ( !callStat.status ) {
+						//plog( ... )
+						render_page( status=500, abort=true, errors=callStat.errors );
+					}
+				}
+				else {
+					/*
+					<p>One of two situations have happened.  " & 
 						"Either a:</p><li>default.cfm file was not found in <dir>/app</li><li>" & 
 						"or the function 'application.default' is not defined.</li>" );
-					abort;
+					*/
+					render_page( status=500, abort=true, errors={} );
 				}
 			}
 			logReport( "Success");
@@ -906,65 +1108,85 @@ component name = "ColdMVC" {
 			//Manually wrap the error template here.
 			render_page(
 				status     =500, 
-				errorAddl  =addlError, 
 				errorMsg   =ToString("Error at controller page."), 
 				stackTrace =e
 			);
 			abort;
 		}
 
+		//Query global scope again and check for what's changed 
+		nScope = ListSort( structKeyList( variables ), "textNoCase" );
+		lScope = ListToArray( ListSort( ReplaceList( nScope, oScope,
+			REReplace( oScope, "[a-zA-Z0-9_]", "", "all" ) ), "textNoCase", "asc", ",") ); 
+
+		//Dump the "model" if asked
+		if ( 0 ) {
+			for ( var vv in lScope ) writedump( variables[ vv ] ); 
+		}
 
 		//Then parse the template
-		try 
-		{
+		try {
 			//Try to reorganize all of this so that the conditions stack in a more sensible way
-			logReport( "Evaluating view for resource");
+			logReport( "Evaluating views..." );
+			var callStat=0; 
+			var pageArray=0;
+			var ev;
 			
 			//Save content to make it easier to serve alternate mimetypes.
-			savecontent variable="cms.content" 
-			{
+			savecontent variable="cms.content" {
 				//Check if something called view exists first	 
-				if (check_deep_key(appdata, "routes", rname, "view")) 
-				{
+				if (check_deep_key(appdata, "routes", rname, "view")) {
 					//Get the type name
 					ev = checkArrayOrString( appdata.routes[rname], "view" );
-					if ( ev.type == "string" )
-						_include ( where = "views", name = ev.value );
-					else if ( ev.type == "array" )
-						for ( x in ev.value ) _include( where ="views", name = x );
-					else if ( ev.type == "struct" )
-					{
-						//This is an exception for now...
-						logReport( "<br />Views as structs are not yet supported.  Please fix your data.cfm file." );
-						render_page( 
-							status = 500,
-							errorMsg = "Views as structs are not yet supported.  Please fix your data.cfm file."
-						);
-						abort;
+
+					//Custom message is needed here somewhere...
+					if ( ev.type != "string" && ev.type != "array" )
+						render_page( status=500, errors={} );
+
+					//Set pageArray if it's string or array
+					pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
+
+					//Now load each model, should probably put these in a scope
+					for ( var x in ev.value ) {
+						callStat = _include( where="views", name=x );
+						if ( !callStat.status ) {
+							//plog( ... )
+							//"Views as structs are not yet supported.  Please fix your data.cfm file."
+							render_page( status=500, errors=callStat.errors );
+						}
 					}
 				}
-				else if (check_deep_key(appdata, "routes", rname) && StructIsEmpty(appdata.routes[rname]))
-				{
+				else if (check_deep_key(appdata, "routes", rname) && StructIsEmpty(appdata.routes[rname])) {
 					logReport( "Load view with same name as route." );
-					_include (where = "views" , name = rname); //& ".cfm"); 
+					callStat = _include( where="views" , name=rname );
+					if ( !callStat.status ) {
+						//plog( ... )
+						//"Views as structs are not yet supported.  Please fix your data.cfm file."
+						render_page( status=500, errors=callStat.errors );
+					}
 				}
-				//Then check if it's blank, and load itself
 				else {
-					logReport( "Load default route." );
-					_include (where = "views", name = "default");
+					logReport( "Load default view." );
+					callStat = _include( where="views", name="default" );
+					if ( !callStat.status ) {
+						render_page( status=500, errors=callStat.errors );
+					}
 				}
 			}
 			logReport("Success");
-			//render_page(content=cms.content, errorMsg="none");
 		}
 		catch (any e) {
 			render_page(status=500, errorMsg=ToString("Error in parsing view."), stackTrace=e);
 			abort;
 		}
 
+
 		// Evaluate any post functions (not sure what these would be yet)
-		if (check_deep_key(appdata, "master-post")) 
-		{
+		if ( !check_deep_key(appdata, "master-post") ) {
+		//if ( check_deep_key(appdata, "master-post") ) {
+			render_page( status=200, content=cms.content, errorMsg="none");
+		}
+		else {
 			if (appdata["master-post"] && !check_deep_key(appdata, "routes", rname, "content-type")) {
 				try {
 					logReport("Evaluating route for post hook");
@@ -975,19 +1197,15 @@ component name = "ColdMVC" {
 					}
 				
 					logReport("Success");
-					render_page(content=post_content, errorMsg="none");
+					render_page( status=200, content=post_content, errorMsg="none" );
 				}
 				catch (any e) {
-					render_page(status=500, errorMsg=ToString("Error in parsing view."), stackTrace=e);
+					render_page( status=500, errorMsg=ToString("Error in parsing view."), stackTrace=e );
 				}
 			}
 			else {
-				render_page(content=cms.content, errorMsg="none");
+				render_page( status=200, content=cms.content, errorMsg="none");
 			}
-		}
-
-		else {
-			render_page(content=cms.content, errorMsg="none");
 		}
 	}
 
@@ -1061,11 +1279,11 @@ component name = "ColdMVC" {
 	//	String list 
 	//	Check in structs for elements
 	public Boolean function check_deep_key (Struct Item, String list) {
-		thisMember=Item;
-		nextMember=Item;
+		var thisMember=Item;
+		var nextMember=Item;
 
 		//Loop through each string in the argument list. 
-		for (i=2; i <=	ArrayLen(Arguments); i++) {
+		for (var i=2; i <= ArrayLen(Arguments); i++) {
 			//Check if the struct is a struct and if it contains a matching key.
 			if (!isStruct(thisMember) || !StructKeyExists(thisMember, Arguments[i]))
 				return 0;
@@ -1091,53 +1309,50 @@ component name = "ColdMVC" {
 	//@title: resourceIndex 
 	//@args :
 	//	Find the index of a resource if it exists.  Return 0 if it does not.*/
-	private String function resourceIndex (String name, Struct ResourceList) 
+	private String function resourceIndex (String name, Struct ResList) 
 	{
 		//Define a base here
 		base = "";
 
-		//Create an array of the current routes.
-		if ( !structKeyExists(ResourceList, "routes") )
-			return "default";
-
-		//Handle no routes
-		if ( StructIsEmpty(ResourceList.routes) )
+		//Create an array of the current routes.  Request '{app,views}/default.cfm'
+		//if routes are either undefined or empty
+		if ( !structKeyExists(ResList, "routes") || StructIsEmpty(ResList.routes) )
 			return "default";
 
 		//If there is a base -- ...
-		if ( StructKeyExists( ResourceList, "base" ) )
-		{
-			if ( Len( ResourceList.base ) > 1 )
-				base = ResourceList.base;	
-			else if ( Len(ResourceList.base) == 1 && ResourceList.base == "/" )
+		if ( StructKeyExists( ResList, "base" ) ) {
+			if ( Len( ResList.base ) > 1 )
+				base = ResList.base;	
+			else if ( Len(ResList.base) == 1 && ResList.base == "/" )
 				base = "/";
 			else {
-				base = ResourceList.base;	
+				base = ResList.base;	
 			}
 		}
 
 		//Check for resources in GET or the CGI.stringpath 
-		if ( StructKeyExists(ResourceList, "handler") && CompareNoCase(ResourceList.handler, "get") == 0 )
-		{
+		if ( StructKeyExists(ResList, "handler") && !CompareNoCase(ResList.handler, "get") ) {
 			if (isDefined("url") and isDefined("url.action"))
 				name = url.action;
 			else {
-				if (StructKeyExists(ResourceList, "base"))
+				if (StructKeyExists(ResList, "base")) {
 					name = Replace(name, base, "");
+				}
 			}
 		}
 		else {
 			//Cut out only routes that are relevant to the current application.
-			if (StructKeyExists(ResourceList, "base"))
+			if (StructKeyExists(ResList, "base")) {
 				name = Replace(name, base, "");
+			}
 		}
 
-		//Handle the default route if ResourceList is not based off of URL
-		if (!StructKeyExists(ResourceList, "handler") && name == "index.cfm")
+		//Handle the default route if ResList is not based off of URL
+		if (!StructKeyExists(ResList, "handler") && name == "index.cfm")
 			return "default";
 
 		//If you made it this far, search for the requested endpoint
-		for (x in ResourceList.routes) 
+		for (x in ResList.routes) 
 		{
 			if (name == x) 
 				return x;
@@ -1268,7 +1483,7 @@ component name = "ColdMVC" {
 
 	//Check a struct for certain values by comparison against another struct
 	public function cmValidate ( cStruct, vStruct ) {
-		s = StructNew();
+		var s = StructNew();
 		s.status = true;
 		s.message = "";
 		s.results = StructNew();
@@ -1412,7 +1627,7 @@ component name = "ColdMVC" {
 	}
 
 
-	//@title: render_page
+	//@title: _insert 
 	//@args :
 	//	v = ...
 	//	Add to database without anything complex
@@ -1692,8 +1907,7 @@ component name = "ColdMVC" {
 	//@args :
 	//	Struct Appscope = ...
 	//	Initialize ColdMVC
-	public ColdMVC function init (Struct appscope) 
-	{
+	public ColdMVC function init (Struct appscope) {
 		//Add pre and post
 		if (StructKeyExists(appscope, "post"))
 			this.post = appscope.post;
@@ -1720,7 +1934,7 @@ component name = "ColdMVC" {
 
 
 		//Check that JSON manifest contains everything necessary.
-		keys = { 
+		var keys = { 
 			_required = [
 				 "base" 
 				,"routes"    ],
@@ -1731,7 +1945,7 @@ component name = "ColdMVC" {
 			]
 		};
 
-		for ( key in keys._required )
+		for ( var key in keys._required )
 		{
 			rname = "";
 			if ( !StructKeyExists( appdata, key  ) )
@@ -1742,10 +1956,11 @@ component name = "ColdMVC" {
 			}
 		}
 
-		if ( StructKeyExists( appdata, "settings" ) ) 
-			for ( key in keys._optional )
+		if ( StructKeyExists( appdata, "settings" ) ) {
+			for ( var key in keys._optional ) {
 				this[key] = (StructKeyExists(appdata.settings, key)) ? appdata.settings[ key ] : false;
-
+			}
+		}
 		this.app = appdata;	
 		return this;
 	}

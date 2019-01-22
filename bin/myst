@@ -1,10 +1,10 @@
 #!/bin/bash -
 # -------------------------------------------- #
-# coldmvc.sh
+# myst.sh
 #
 # Summary
 # -------
-# An administration interface for ColdMVC sites.
+# An administration interface for Myst sites.
 #
 # Author
 # ------
@@ -30,9 +30,11 @@
 
 # const 
 PROGRAM_NAME=`basename $0`
-SYMNAME=coldmvc
-PROPNAME=ColdMVC
+SYMNAME=myst
+PROPNAME=Myst
 CONF_FILE="/etc/${SYMNAME}.conf"
+#SRCREPO=https://mystframework.com/git
+SRCREPO=https://github.com/zaiah-dj/coldmvc
 
 # unconst
 DIR=
@@ -42,6 +44,7 @@ SRC=.
 DO_SES=0
 DO_GENVHOST=0
 CREATE=0
+UPDATE=0
 NO_GIT=0
 ACTIVATE=0
 VERBOSE=0
@@ -70,6 +73,7 @@ usage() {
 	cat <<USAGES
 $PROGRAM_NAME:
 -c, --create             Create a new instance. 
+-u, --update <arg>       Update the instance at <arg>. 
     --activate <dir>     Activate a site (turn off defaults that ship with new projects)
     --apache             Create an .htaccess file
     --nginx              Create an Apache-style virtual host and an .htaccess file.
@@ -139,6 +143,16 @@ do
 		-c|--create)
 			CREATE=1
 		;;
+
+		# Administration stuff
+		-u|--update)
+			UPDATE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			shift
+			FOLDER="$1"
+		;;
+
 
 		# Turn off the 'default' that ships
 		--activate)
@@ -328,12 +342,13 @@ Uses Git?     `test $NO_GIT -eq 1 && echo "No" || echo "Yes"`
 EOF
 	}
 
-	# Set up a new CMVC instance
+	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PROPNAME application folders...\n"
 	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,routes,log,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,js}/
-	mkdir $MKDIR_FLAGS $DIR/db/static
-	mkdir $MKDIR_FLAGS $DIR/std/custom
+	mkdir $MKDIR_FLAGS $DIR/db/static/
+	mkdir $MKDIR_FLAGS $DIR/std/custom/
+	mkdir $MKDIR_FLAGS $DIR/std/components/
 
 
 	# Populate the new instance
@@ -343,6 +358,7 @@ EOF
 	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
 	cp $CP_FLAGS $SHAREDIR/failure.cfm $DIR/std/
 	cp $CP_FLAGS $SHAREDIR/{4xx,5xx,mime,html}-view.cfm $DIR/std/
+	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
@@ -373,19 +389,19 @@ EOF
 		sed -i "" "{
 			s/__DATASOURCE__/${DATASOURCE}/
 			s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
-			s;__BASE__;${BASEDIR};
-			s/__NAME__/${NAME}/
-			s/__AUTHOR__/${AUTHOR}/
-			s/__TITLE__/${TITLE}/
+			s;__BASE__;${BASEDIR:-"/"};
+			s/__NAME__/${NAME:-"anon"}/
+			s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
+			s/__TITLE__/${TITLE:-"Titleless Website"}/
 		}" $DIR/data.cfm
 	else
 		sed -i "{
 			s/__DATASOURCE__/${DATASOURCE}/
 			s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
-			s;__BASE__;${BASEDIR};
-			s/__NAME__/${NAME}/
-			s/__AUTHOR__/${AUTHOR}/
-			s/__TITLE__/${TITLE}/
+			s;__BASE__;${BASEDIR:-"/"};
+			s/__NAME__/${NAME:-"anon"}/
+			s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
+			s/__TITLE__/${TITLE:-"Titleless Website"}/
 		}" $DIR/data.cfm
 	fi
 	[ $VERBOSE -eq 1 ] && echo DONE!
@@ -421,6 +437,30 @@ GIT
 	fi	
 fi
 
+
+
+# Update site backend and tools with the newest version from the most current
+# HEAD
+if [ $UPDATE -eq 1 ]
+then
+	# Checks 
+	[ ! -z "$FOLDER" ] || err "No application specified for update."
+	[   -d "$FOLDER" ] || \
+		err "The application at folder '$FOLDER' does not seem to exist or is not accessible." 1
+	[   -f "$FOLDER/$SYMNAME.cfc" ] || \
+		err "The application at folder '$FOLDER' does not seem to be a Myst application." 1
+
+	# I don't really need Git to control rollbacks, it's nice, but not necessary
+	[ $VERBOSE -eq 1 ] && echo "Pulling latest copy of $SYMNAME repository."
+	git clone $SRCREPO /tmp/myst
+	cd /tmp/myst/ && git checkout -b myst && git pull github myst && cd -
+	# TODO: Do a simple HTTP GET for the latest version and untar.  These tools
+	# are more or less guaranteed to be present on a system, whereas Git won't.
+	mv $MV_FLAGS $FOLDER/myst.cfc $FOLDER/myst_.cfc
+	cp $CP_FLAGS /tmp/myst/myst.cfc $FOLDER/
+	rm -rf /tmp/myst/
+	exit 0
+fi
 
 
 # Generate additional Tomcat hosts

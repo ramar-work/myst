@@ -1,6 +1,6 @@
 #!/bin/sh -
 # -------------------------------------------- #
-# coldmod.sh
+# mystmod.sh
 #
 # @author
 #		Antonio R. Collins II (rc@tubularmodular.com, ramar.collins@gmail.com)
@@ -24,10 +24,10 @@
 # -------------------------------------------- #
 
 # Variable list
-PROGRAM_NAME=coldmvc
+PROGRAM_NAME=mystmod
 DIR=
 #SRC= This will be filled out during the install process...
-SRC=.
+SRCDIR=.
 CREATE=0
 NO_GIT=0
 VERBOSE=0
@@ -49,17 +49,18 @@ usage()
 
 	cat <<USAGES
 $0:
--c, --create            Create a new instance. 
-    --apachify          Create an Apache-style virtual host and an .htaccess file.
-    --no-git            Don't create a Git repo.
--e, --engine <arg>      Specify which CFML engine you're running [ Lucee, Coldfusion ]
--f, --folder <arg>      Specify which folder to use when creating a new instance.
--n, --name <arg>        Specify a name to use for a new instance. 
--m, --domain <arg>      Specify a domain name to host this particular instance.
--d, --description <arg> Specify a description for the new instance.
--s, --datasource <arg>  Specify a default datasource for use with the new instance.
--v, --verbose           Be verbose.
--h, --help              Show this help and quit.
+-c, --create            Create a new module. 
+-f, --folder <arg>      Specify which folder to use when creating a new module.
+-n, --name <arg>        Specify a name to use for the new module. 
+-t, --test-on <arg>     Compresses the current Git HEAD and applies to a Myst instance. 
+
+Metadata options:
+-a, --author <arg>       Specify an author for the new module.
+-d, --description <arg>  Specify a description for the new module.
+    --datasource <arg>   Specify a default datasource for use with the new instance.
+
+-v, --verbose            Be verbose.
+-h, --help               Show this help and quit.
 USAGES
 
 	exit $STATUS
@@ -105,7 +106,7 @@ do
 		-n|--name)
 			# Another parameter in data.json
 			shift
-			NAME="$1"	
+			MODNAME="$1"	
 		;;
 
 		-m|--domain)
@@ -144,8 +145,45 @@ do
 	shift
 done
 
-echo "Fix ME before running! There are issues..."
+
+if [ $CREATE -eq 1 ]
+then
+	test ! -z $MODNAME || err "No module name specified." 1
+
+	mkdir -pv $MODNAME/{app,assets,components,db,routes,setup,sql,std,views}/$MODNAME
+
+	for ff in Makefile README.md components/standard.cfc
+	do
+		DASH_COUNT=`echo $MODNAME | sed 's/[0-9,A-Z,a-z]/-/g'`
+		BASENAME=`basename $ff`	
+		sed "{
+			s/__MODNAME__/$MODNAME/g ; 
+			s/__DASHES__/$DASH_COUNT/g ;
+			s/__SUMMARY__/${SUMMARY:-''}/g ;
+			s/__DESCRIPTION__/${DESCRIPTION:-''}/g ;
+			s/__AUTHOR__/${AUTHOR:-''}/g ;
+			s/__USAGE__/${USAGE:-''}/g ;
+		}" $SRCDIR/share/$PROGRAM_NAME/$BASENAME #> $MODNAME/$ff
+	done
+
+	mv -v $MODNAME/components/standard.cfc $MODNAME/components/$MODNAME.cfc
+
+	if [ $NO_GIT -eq 1 ]
+	then	
+		cd $MODNAME
+		git init
+		git add .
+		git commit -m "Initial commit of module '$MODNAME'"
+		cd -
+	fi
+
+	[ $DO_VERBOSE -eq 1 ] && printf "Successfully created module '$MODNAME'\n" 
+fi
 exit
+
+
+
+
 
 # CREATE NEW CMVC INSTANCES
 if [ $CREATE -eq 1 ]
