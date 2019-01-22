@@ -6,7 +6,7 @@ BINDIR = $(PREFIX)/bin
 CONFIG = /etc
 WILDCARD=*
 NAME=myst
-
+VERSION=v0.2
 
 # list - List all the targets and what they do
 list:
@@ -39,7 +39,8 @@ pkgMakefile:
 
 # pkg - Create new packages for distribution
 pkg:
-	git archive master HEAD | tar czf - > /tmp/$(NAME).`date +%F`.`date +%H-%M-%S`.tar.gz
+	git archive --format=tar --prefix=myst/ `git tag | tail -n 1` | \
+		gzip > /tmp/$(NAME)-`git tag | tail -n 1`.tar.gz
 
 
 # testprojects - Generate projects that stress test Apache proxy and Lucee standalone installs
