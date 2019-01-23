@@ -1,0 +1,285 @@
+#!/bin/bash -
+# -------------------------------------------- #
+# mystdb.sh
+#
+# Summary
+# -------
+# A datasource creator for myst
+#
+# Author
+# ------
+#	Antonio R. Collins II (ramar.collins@gmail.com, rc@tubularmodular.com)
+# Copyright 2016-Present, Tubular Modular
+# Original Author Date: Tue Jan 22 18:43:59 EST 2019
+#
+# Usage
+# -----
+# ???
+# 	
+# TODO
+# ----
+# -------------------------------------------- #
+
+PROGRAM_NAME=`basename $0`
+SYMNAME=myst
+CONF_FILE=/etc/myst.conf
+
+DB_NAME=
+DB_SYMNAME=
+DB_USER=
+DB_PWD=
+DB_REMOTEHOST=
+FOLDER=
+
+REMOTE_HOST=
+DO_POSTGRES=0
+DO_MYSQL=0
+DO_MSSQL=0
+
+DO_VERBOSE=0
+DO_CREATE=0
+DO_GENERATE=0
+
+
+CONF_DBCONNLIMIT=100
+CONF_DBUSERNAME=
+CONF_DBPASSWORD=
+CONF_DBPORT=
+DATASOURCE_FILE=
+
+# An error function
+err() {
+	STATUS=${2:-0}
+	printf "$PROGRAM_NAME: $1\n" > /dev/stderr
+	exit $STATUS
+}
+
+
+# Generate a usage message
+usage() {
+	STATUS=${2:-0}
+	cat <<EOF
+$PROGRAM_NAME:
+-c, --create            Create a datasource block. 
+-g, --generate          Generate a datasource on the database server.
+-f, --folder <arg>      Add the datasource to the app at <arg>
+-n, --name <arg>        Datasource will have name <arg>
+-u, --user <arg>        Use this user name with the new data source.
+    --password <arg>    Use this password with the new data source.
+-c, --max-conn <arg>    How many connections should the new data source be able to take?
+    --remote <arg>      The location of a remote server that this should attach to.
+-p, --postgres          Assume the source is a PostgreSQL data source.
+-m, --mysql             Assume the source is a MySQL data source.
+-s, --mssql             Assume the source is a Microsoft SQL server data source.
+-v, --verbose           Be verbose.
+-h, --help              Show help.
+EOF
+	exit $STATUS
+}
+
+
+# Determine whether an argument is a flag or not
+detFlag() {
+	if [ -z "$1" ]
+	then
+		echo -1 
+	else
+		# arg is a single, lonely dash
+		if [ ${#1} -eq 1 ] && [ $1 == '-' ] 
+		then
+			echo 0
+
+		# arg is a short arg flag 
+		elif [ ${1:0:1} == '-' ] && [[ ${1:1:1} =~ [a-z] ]]
+		then
+			echo -1 
+
+		# arg is a long arg flag 
+		elif [ ${1:0:1} == '-' ] && [ ${1:1:1} == '-' ]
+		then
+			echo -1 
+
+		# arg is an arg
+		else
+			echo 1
+
+		fi
+	fi
+}
+
+
+# Catch blank arguments
+[ $# -eq 0 ] && usage 0 
+
+
+# Process any options
+while [ $# -gt 0 ]
+do
+	case "$1" in
+		-c|--create)	
+			DO_CREATE=1
+		;;
+		-g|--generate)	
+			DO_GENERATE=1	
+		;;
+		-f|--folder)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			FOLDER="$1"
+		;;
+		-n|--name)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_NAME="$1"
+		;;
+
+		-x|--max-conn)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			CONF_DBCONNLIMIT=$1
+		;;
+
+		-u|--user)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_USER="$1"
+		;;
+		--password)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_PWD="$1"
+		;;
+		--remote)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_REMOTEHOST="$1"
+		;;
+		-p|--postgres)	
+			DO_POSTGRES=1
+		;;
+		-m|--mysql)	
+			DO_MYSQL=1
+		;;
+		-s|--mssql)	
+			DO_MSSQL=1
+		;;
+		-v|--verbose)	
+			VERBOSE=1
+		;;
+
+		-h|--help)	
+			usage 0
+		;;
+
+		--)	break
+		;;
+
+		-*)	printf "$PROGRAM_NAME: Unknown argument received: $1\n" > /dev/stderr; usage 1
+		;;
+	esac
+	shift
+done
+
+
+# Also check for the config file, and come up with some defaults if not running
+# a globally installed copy (or just fail and say you should install it)
+if [ ! -f $CONF_FILE ]
+then
+	printf "$PROGRAM_NAME: $PROPNAME hasn't been installed yet.  " 
+	printf "Please run 'make install' from $PROPNAME's source directory.\n"
+	exit 
+fi 
+
+
+# Include the file and check that prefix exists
+source $CONF_FILE
+[ ! -d $PREFIX ] && err "$PROPNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+
+
+# Set a default port
+[ $DO_POSTGRES -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-0}; DBSUFFIX="pgsql"; }
+[ $DO_MYSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-3306}; DBSUFFIX="mysql"; }
+[ $DO_MSSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-1433}; DBSUFFIX="mssql"; }
+DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
+DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
+
+
+# We can optionally create the datasource if it's running.
+# On Linux, these are just their own servers.
+if [ $DO_CREATE -eq 1 ]
+then
+	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
+	# who to do this as most likely.
+	if [ $DO_POSTGRES -eq 1 ]
+	then
+		printf ''
+	fi
+
+
+	if [ $DO_MYSQL -eq 1 ]
+	then
+		printf ''
+	fi
+
+
+	if [ $DO_MSSQL -eq 1 ]
+	then
+		printf ''
+	fi
+
+	# Actually invoke SQL client and do an upload.
+	# ...
+fi
+
+
+# Generate a datasource
+if [ $DO_GENERATE -eq 1 ]
+then
+	[ -z "$DATASOURCE_FILE" ] && \
+		err "No database backend specified. (Use --mysql, --mssql, or --postgresql to specify one)." 1
+
+	[ -z "$DB_NAME" ] && \
+		err "No database name specified.  (Try --name \$DBNAME)." 1
+
+	[ -z "$DB_USER" ] && \
+		err "No database user specified.  (Try --user \$USERNAME)." 1
+
+	[ -z "$DB_PWD" ] && \
+		err "No database password specified for user.  (Try --password \$PASSWORD)." 1
+
+	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
+	# who to do this as most likely.
+	if [ $DO_POSTGRES -eq 1 ]
+	then
+		printf ''
+	fi
+
+
+	if [ $DO_MYSQL -eq 1 ]
+	then
+		printf ''
+	fi
+
+
+	if [ $DO_MSSQL -eq 1 ]
+	then
+		# Generate a 
+		printf ''
+	fi
+
+	# Replace everything
+	sed "{
+		s/__DBNAME__/$DB_NAME/;
+		s/__DBSYMNAME__/$DB_SYMNAME/;
+		s/__DBCONNLIMIT__/$CONF_DBCONNLIMIT/;
+		s/__DBUSERNAME__/$DB_USER/;
+		s/__DBPASSWORD__/$DB_PWD/;
+		s/__DBPORT__/$CONF_DBPORT/;
+	}" $DATASOURCE_FILE
+fi
