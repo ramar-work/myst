@@ -28,4 +28,54 @@
 # not to reload them everytime or not 
 
 
+# An error function
+err() {
+	STATUS=${2:-0}
+	printf "$PROGRAM_NAME: $1\n" > /dev/stderr
+	exit $STATUS
+}
+
+
+# A usage function
+usage() {
+	STATUS=${2:-0}
+	exit $STATUS
+}
+
+
+# Check for the config file, and lib files, stopping if either isn't present. 
+[ ! -f $CONF_FILE ] && \
+	err "$PNAME is not installed yet.  Please run 'make install' from $PNAME's source directory.\n"  1
+source $CONF_FILE
+[ ! -d $PREFIX ] && err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+[ ! -f $PREFIX/$LIB_FILE ] && err "$PNAME didn't install correctly (couldn't find $LIB_FILE)\n" 1
+source $PREFIX/$LIB_FILE
+
+
+# Catch blank arguments
+[ $# -eq 0 ] && usage 0 
+
+
+# Process any options
+while [ $# -gt 0 ]
+do
+	case "$1" in
+		# Verbose
+		-v|--verbose)	
+			VERBOSE=1
+		;;
+
+		--help)	
+			usage 0
+		;;
+
+		--)	break
+		;;
+
+		-*)	printf "$PROGRAM_NAME: Unknown argument received: $1\n" > /dev/stderr; usage 1
+		;;
+	esac
+	shift
+done
+
 

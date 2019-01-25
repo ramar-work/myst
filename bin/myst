@@ -31,15 +31,15 @@
 # const 
 PROGRAM_NAME=`basename $0`
 SYMNAME=myst
-PROPNAME=Myst
-CONF_FILE="/etc/${SYMNAME}.conf"
-#SRCREPO=https://mystframework.com/git
-SRCREPO=https://github.com/zaiah-dj/coldmvc
+PNAME=Myst
+CONF_FILE=/etc/myst.conf
+LIB_FILE=share/myst/mystlib.sh
+SRCREPO=https://github.com/tubularmodular/myst
+CHECK="sed|xxd -h|git -h|md5sum -h|diff"
 
 # unconst
 DIR=
 THIS_SITE=
-#SRC= This will be filled out during the install process...
 SRC=.
 DO_SES=0
 DO_GENVHOST=0
@@ -51,9 +51,9 @@ VERBOSE=0
 ERR_NODIR=1
 ERR_NONAME=2
 APACHIFY=0
-
 SES_FILE=
 VHOST_FILE=
+
 
 # An error function
 err() {
@@ -95,40 +95,13 @@ USAGES
 }
 
 
-# Determine whether an argument is a flag or not
-detFlag() {
-	if [ -z "$1" ]
-	then
-		echo -1 
-	else
-		# arg is a single, lonely dash
-		if [ ${#1} -eq 1 ] && [ $1 == '-' ] 
-		then
-			echo 0
-
-		# arg is a short arg flag 
-		elif [ ${1:0:1} == '-' ] && [[ ${1:1:1} =~ [a-z] ]]
-		then
-			echo -1 
-
-		# arg is a long arg flag 
-		elif [ ${1:0:1} == '-' ] && [ ${1:1:1} == '-' ]
-		then
-			echo -1 
-
-		# arg is an arg
-		else
-			echo 1
-
-		fi
-	fi
-}
-# Some tests
-#detFlag "boss"
-#detFlag "-a"
-#detFlag "-"
-#detFlag "--achoo"
-#exit
+# Check for the config file, and lib files, stopping if either isn't present. 
+[ ! -f $CONF_FILE ] && \
+	err "$PNAME is not installed yet.  Please run 'make install' from $PNAME's source directory.\n"  1
+source $CONF_FILE
+[ ! -d $PREFIX ] && err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+[ ! -f $PREFIX/$LIB_FILE ] && err "$PNAME didn't install correctly (couldn't find $LIB_FILE)\n" 1
+source $PREFIX/$LIB_FILE
 
 
 # Catch blank arguments
@@ -272,28 +245,6 @@ do
 	shift
 done
 
-# Check for dependencies 
-CHECK="sed|xxd -h|git -h|md5sum -h|diff"
-IFS='|'
-for n in $CHECK; do sh -c ${n} 2>/dev/null; [ $? -eq 127 ] && {
-	printf "$PROGRAM_NAME: Dependency '$n' not found.  "
-	printf "Please install package '$n' using a package manager.\n" > /dev/stderr; } done
-IFS=" "
-
-# Also check for the config file, and come up with some defaults if not running
-# a globally installed copy (or just fail and say you should install it)
-if [ ! -f $CONF_FILE ]
-then
-	printf "$PROGRAM_NAME: $PROPNAME hasn't been installed yet.  " 
-	printf "Please run 'make install' from $PROPNAME's source directory.\n"
-	exit 
-fi 
-
-
-# Include the file and check that prefix exists
-source $CONF_FILE
-[ ! -d $PREFIX ] && err "$PROPNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
-
 
 # Handle verbosity
 [ $VERBOSE -eq 1 ] && MKDIR_FLAGS="-pv" || MKDIR_FLAGS="-p"
@@ -304,7 +255,7 @@ source $CONF_FILE
 # CREATE NEW CMVC INSTANCES
 if [ $CREATE -eq 1 ]
 then
-	# $PROPNAME's source code will probably be at /etc/
+	# $PNAME's source code will probably be at /etc/
 	# When built, this variable will probably be here
 	
 	# Check that a directory has been specified
@@ -328,7 +279,7 @@ then
 
 	# It's a good time for a message
 	[ $VERBOSE -eq 1 ] && {
-		printf "Creating new $PROPNAME instance with the following parameters.\n"
+		printf "Creating new $PNAME instance with the following parameters.\n"
 		#Uses Apache?  `test $NO_GIT -eq 1 && echo "No" || echo "Yes"`
 		cat <<EOF
 DIR         = $DIR
@@ -343,7 +294,7 @@ EOF
 	}
 
 	# Set up a new Myst instance
-	[ $VERBOSE -eq 1 ] && printf "\n* Create $PROPNAME application folders...\n"
+	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
 	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,routes,log,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,js}/
 	mkdir $MKDIR_FLAGS $DIR/db/static/
@@ -352,7 +303,7 @@ EOF
 
 
 	# Populate the new instance
-	[ $VERBOSE -eq 1 ] && printf "\n* Populating new $PROPNAME instance...\n"
+	[ $VERBOSE -eq 1 ] && printf "\n* Populating new $PNAME instance...\n"
 	cp $CP_FLAGS $SHAREDIR/{Application.cfc,$SYMNAME.cfc,index.cfm,data.cfm,data.cfm.example} $DIR/
 	cp $CP_FLAGS $SHAREDIR/app-default.cfm $DIR/app/default.cfm
 	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
@@ -482,7 +433,7 @@ fi
 if [ $ACTIVATE -eq 1 ]
 then
 	#
-	[ $VERBOSE -eq 1 ] && printf "Checking for valid $PROPNAME instance '$THIS_SITE'...\n" 
+	[ $VERBOSE -eq 1 ] && printf "Checking for valid $PNAME instance '$THIS_SITE'...\n" 
 
 	# Could be thrown after --create, so prefill
 	THIS_SITE="${THIS_SITE:-$DIR}"
@@ -497,7 +448,7 @@ then
 	test -d "$THIS_SITE" || err "Folder does not exist...\n" 1
 
 	# Check that it's an instance
-	test -d "$THIS_SITE/app" && test -d "$THIS_SITE/views" || err "Folder is not a $PROPNAME instance...\n" 1
+	test -d "$THIS_SITE/app" && test -d "$THIS_SITE/views" || err "Folder is not a $PNAME instance...\n" 1
 		
 	# Check that the files we need to move exist
 	test -f $THIS_SITE/app/default.cfm || err "Default model file may have already been modified...\n" 1

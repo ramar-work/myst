@@ -25,6 +25,9 @@
 
 # Variable list
 PROGRAM_NAME=mystmod
+CONF_FILE=/etc/myst.conf
+LIB_FILE=share/myst/mystlib.sh
+
 DIR=
 #SRC= This will be filled out during the install process...
 SRCDIR=.
@@ -32,8 +35,8 @@ CREATE=0
 NO_GIT=0
 ERR_NODIR=1
 ERR_NONAME=2
-
 DO_VERBOSE=0
+
 
 # An error function
 err() {
@@ -44,16 +47,21 @@ err() {
 
 
 # A usage function
-usage()
-{
+usage() {
 	STATUS=${2:-0}
 
 	cat <<USAGES
 $0:
+Creation options:
 -c, --create            Create a new module. 
 -f, --folder <arg>      Specify which folder to use when creating a new module.
 -n, --name <arg>        Specify a name to use for the new module. 
 -t, --test-on <arg>     Compresses the current Git HEAD and applies to a Myst instance. 
+
+Install options:
+-i, --install <arg>     Specify which folder to use when creating a new module.
+    --from <arg>        Choose folder or file where the project may be. (BETA)
+    --to <arg>          Install the extension to <arg> 
 
 Metadata options:
 -a, --author <arg>       Specify an author for the new module.
@@ -66,6 +74,15 @@ USAGES
 
 	exit $STATUS
 }
+
+
+# Check for the config file, and lib files, stopping if either isn't present. 
+[ ! -f $CONF_FILE ] && \
+	err "$PNAME is not installed yet.  Please run 'make install' from $PNAME's source directory.\n"  1
+source $CONF_FILE
+[ ! -d $PREFIX ] && err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+[ ! -f $PREFIX/$LIB_FILE ] && err "$PNAME didn't install correctly (couldn't find $LIB_FILE)\n" 1
+source $PREFIX/$LIB_FILE
 
 
 # Catch blank arguments
@@ -105,6 +122,24 @@ do
 		;;
 
 		-n|--name)
+			# Another parameter in data.json
+			shift
+			MODNAME="$1"	
+		;;
+
+		-i|--install)
+			# Another parameter in data.json
+			shift
+			MODNAME="$1"	
+		;;
+
+		--from)
+			# Another parameter in data.json
+			shift
+			MODNAME="$1"	
+		;;
+
+		--to)
 			# Another parameter in data.json
 			shift
 			MODNAME="$1"	

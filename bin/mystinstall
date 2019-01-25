@@ -35,6 +35,8 @@ LUCEE_PREFIX=/usr/local/myst/lucee
 FILE_BASE=$PREFIX/share/myst/mystinstall
 TMP_DIR=/var/tmp
 CHECK="sed grep wget systemctl httpd"
+CONF_FILE=/etc/myst.conf
+LIB_FILE=share/myst/mystlib.sh
 
 
 # unconst
@@ -48,6 +50,19 @@ TOMCAT_AJP_PORT=8009
 TOMCAT_SECRET_KEY=
 TEST_DOMAIN=
 DO_DUMP=0
+
+
+# Options
+DO_DEBUG=0
+DO_VERBOSE=0
+DO_DOWNLOAD=1
+DO_FULL=0
+DO_AUTOMATED=0
+DO_UNPRIVELEGED=0
+LUCEE_VERSION=
+LUCEE_USER=
+LUCEE_PASS=
+TEST_DOMAIN=
 
 
 # err
@@ -81,32 +96,17 @@ EOF
 }
 
 
-# Options
-DO_DEBUG=0
-DO_VERBOSE=0
-DO_DOWNLOAD=1
-DO_FULL=0
-DO_AUTOMATED=0
-DO_UNPRIVELEGED=0
-LUCEE_VERSION=
-LUCEE_USER=
-LUCEE_PASS=
-TEST_DOMAIN=
+# Check for the config file, and lib files, stopping if either isn't present. 
+[ ! -f $CONF_FILE ] && \
+	err "$PNAME is not installed yet.  Please run 'make install' from $PNAME's source directory.\n"  1
+source $CONF_FILE
+[ ! -d $PREFIX ] && err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+[ ! -f $PREFIX/$LIB_FILE ] && err "$PNAME didn't install correctly (couldn't find $LIB_FILE)\n" 1
+source $PREFIX/$LIB_FILE
 
 
 # Die with no options
 [ $# -eq 0 ] && usage 0
-
-
-# If I've installed, source a list of things
-test -f /etc/myst.conf || {
-	printf "`basename $0`: It looks like myst has not been fully installed yet.\n" > /dev/stderr
-	printf "Please install it via 'make install' from the myst src directory.\n" > /dev/stderr
-	exit 0
-}
-
-source /etc/myst.conf
-#echo $PREFIX
 
 
 # Loop to process cl args
