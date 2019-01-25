@@ -9,3 +9,7 @@ datasources.todo
 TODO
 myst.todo
 myst_.cfc
+
+# until these make some headway, let's leave them out of the repo
+bin/mysttest
+bin/mystapi

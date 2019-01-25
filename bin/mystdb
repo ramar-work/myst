@@ -23,6 +23,7 @@
 PROGRAM_NAME=`basename $0`
 SYMNAME=myst
 CONF_FILE=/etc/myst.conf
+LIB_FILE=share/myst/mystlib.sh
 
 DB_NAME=
 DB_SYMNAME=
