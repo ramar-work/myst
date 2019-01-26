@@ -21,8 +21,6 @@
 component {
 	function onRequest (string targetPage)  {
 		include "../data.cfm";
-writedump( manifest )
-
 		try {
 			location( url=manifest.base, addtoken='no' ); 
 		} 

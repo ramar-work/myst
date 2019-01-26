@@ -51,8 +51,9 @@ VERBOSE=0
 ERR_NODIR=1
 ERR_NONAME=2
 APACHIFY=0
-SES_FILE=
+ENGINE=
 VHOST_FILE=
+BACKUP_FILE=
 
 
 # An error function
@@ -70,16 +71,15 @@ usage() {
 #-t, --test              Test out data.json with parameters.
 #  --maintenance       Put a site in maintenance mode.
 #-e, --engine <arg>       Specify which CFML engine you're running [ Lucee, Coldfusion ]
+#  --nginx              Create an Apache-style virtual host and an .htaccess file.
+#  --iis                Create an Apache-style virtual host and an .htaccess file.
 	cat <<USAGES
 $PROGRAM_NAME:
+Instance options:
 -c, --create             Create a new instance. 
 -u, --update <arg>       Update the instance at <arg>. 
     --activate <dir>     Activate a site (turn off defaults that ship with new projects)
-    --apache             Create an .htaccess file
-    --nginx              Create an Apache-style virtual host and an .htaccess file.
-    --iis                Create an Apache-style virtual host and an .htaccess file.
     --no-git             Don't create a Git repo.
--i, --virtual-host <arg> Create a \$SERVER-style virtual host and an .htaccess file.
 -e, --ses                Enable search engine safe URLs
 -b, --basedir <arg>      Specify a base directory.
 -f, --folder <arg>       Specify which folder to use when creating a new instance.
@@ -87,6 +87,12 @@ $PROGRAM_NAME:
 -m, --domain <arg>       Specify a domain name to host this particular instance.
 -d, --description <arg>  Specify a description for the new instance.
 -s, --datasource <arg>   Specify a default datasource for use with the new instance.
+
+Modifiers and server-specific options:
+    --apache             Create a root-level configuration file compatible with Apache.
+-i, --virtual-host <arg> Create a \$SERVER-style virtual host and an .htaccess file.
+
+General options:
 -v, --verbose            Be verbose.
 -h, --help               Show this help and quit.
 USAGES
@@ -139,24 +145,24 @@ do
 		# Generate server confiuguration files for an Apache server 
 		--apache|--apachify)
 			APACHIFY=1
+			ENGINE='apache'
 		;;
 
 		# Generate server confiuguration files for an nginx server 
 		--nginx|--nginxify)
 			NGINXIFY=1
+			ENGINE='nginx'
 		;;
 
 		# Generate server confiuguration files for a Microsoft IIS server 
 		--iis|--iisify)
 			IISIFY=1
+			ENGINE='iis'
 		;;
 
 		# Enable the capacity to serve SES URLs via server configuration
 		-e|--ses|--search-engine-safe)
-			DO_SES=1; CODE=`detFlag "$2"`;
-			test $CODE -eq -1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
-			test $CODE -eq 1 && SES_FILE="$2" || SES_FILE=/dev/stdout
-			shift
+			DO_SES=1
 		;;
 
 		# Generate a virtual host file for a particular server configuration
@@ -295,7 +301,7 @@ EOF
 
 	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
-	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,routes,log,setup,sql,std,views}/
+	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,log,misc,routes,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,js}/
 	mkdir $MKDIR_FLAGS $DIR/db/static/
 	mkdir $MKDIR_FLAGS $DIR/std/custom/
@@ -315,7 +321,7 @@ EOF
 
 	# Set up Application redirects
 	[ $VERBOSE -eq 1 ] && printf "\n* Setting up redirects...\n"
-	for _d in app components db log routes setup sql std views
+	for _d in app components db log files misc routes setup sql std views
 	do 
 		[ $VERBOSE -eq 1 ] && echo cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
 		cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
@@ -484,73 +490,87 @@ fi
 if [ $DO_SES -eq 1 ]
 then
 	# Make sure the user specified a directory
-	#[ ! -z "$DIR" ] || err "No directory specified for SES setup..." 1
+	[ ! -z "$DIR" ] || err "No directory specified for SES setup..." 1
 	[ ! -z "$NAME" ] || err "No name specified for SES setup..." 1
+	[[ ! -z "$ENGINE" ]] || err "No server specified for SES setup..." 1
 
+	# Make/add to an .htaccess file
 	if [ $APACHIFY -eq 1 ]
 	then
-		printf '' >/dev/null
+		{
+			cat <<EOF
+# .htaccess for site titled '$NAME', generated `date`
+RewriteEngine on
+RewriteRule ^/?([a-z]+)$ \$1.cfm [L]
+EOF
+		} >> $DIR/.htaccess
 	fi
 
-	# Make an .htaccess file
-	{
-	cat <<EOF
-# Apache .htaccess file for site titled '$NAME', generated `date`
-# Only move forward if the request is root level and does not have an extension
-# TODO: Add another rule to turn .cfm files into something else
-RewriteEngine on
-#RewriteCond %{REQUEST_URI} !^.*\.(bmp|css|gif|htc|html?|ico|jpe?g|js|pdf|png|swf|txt|xml|svg|eot|woff|woff2|ttf|cfm)$
-#RewriteRule "^(.*)$" "eat.cfm?uri=$1"
-EOF
-	} #> $DIR/.htaccess
+	# Add the .htaccess to the repository if .git is activated
+	if [ $CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
+	then
+		cd $DIR
+		git add .htaccess
+		git commit -m "Added .htaccess file for URL handling."
+		cd -
+	fi
 fi 
 
 
-# APACHE VHOST
-if [ $DO_GENVHOST -eq 1 ]
+# Create a virtual host for the server engine in use.
+if [ $DO_GENVHOST -eq 1 ] || [ $CREATE -eq 1 ]
 then
-	# Get some configuration details
-	APACHE_DOCROOT="`httpd -t -D DUMP_RUN_CFG 2>/dev/null| grep 'DocumentRoot:' | awk '{ print $3 }' | sed 's/"//g' `" 
-
 	# Make sure the user specified a directory
 	# [ ! -z "$DIR" ] || err "No directory specified for vhost..." 1
 	# Make sure that directory exists
 	#[ -d "$DIR" ] || err "Directory does not exist, invalid vhost..." 1;
 
-	# Name should probably not be turned off
-	#[ ! -z "$DOMAIN" ] || err "No name specified for vhost..." 1
-	[ ! -z "$NAME" ] || err "No name specified for vhost..." 1
-	[ ! -z "$DOMAIN" ] || err "No domain specified for virtual host..." 1
+	# Generate an Apache virtual host
+	if [ $APACHIFY -eq 1 ]
+	then
+		# Get some configuration details
+		APACHE_DOCROOT="`httpd -t -D DUMP_RUN_CFG 2>/dev/null| grep 'DocumentRoot:' | awk '{ print $3 }' | sed 's/"//g' `" 
 
-	# Virtual host file 
-	{
-cat <<EOF
+		# Name should probably not be turned off
+		#[ ! -z "$DOMAIN" ] || err "No name specified for vhost..." 1
+		[ ! -z "$NAME" ] || err "No name specified for vhost..." 1
+		[ ! -z "$DOMAIN" ] || err "No domain specified for virtual host..." 1
+
+		# If this is a CREATE run, we'll generate a virtual host and put it in misc/
+		[ $CREATE -eq 1 ] && VHOST_FILE=$DIR/misc/apache.vhost
+
+		# Virtual host file 
+		{
+	cat <<EOF
 # Apache virtual host for site titled '$NAME', generated `date`
-<VirtualHost *:80>
-	# Admin email, Server Name (domain name) and any aliases
-	ServerName  $DOMAIN
-	ServerAlias www.$DOMAIN
+	<VirtualHost *:80>
+		# Admin email, Server Name (domain name) and any aliases
+		ServerName  $DOMAIN
+		ServerAlias www.$DOMAIN
+
+		# Index file and Document Root (where the public files are located)
+		DocumentRoot $APACHE_DOCROOT/$NAME/
+
+		# Custom log file locations
+		LogLevel warn
+		ErrorLog  $APACHE_DOCROOT/$NAME/log/srvError.log
+		CustomLog $APACHE_DOCROOT/$NAME/log/srvAccess.log combined
+
+		# Index
+		DirectoryIndex index.cfm index.html
+	</VirtualHost>
 EOF
+		} > $VHOST_FILE
 
-		# any additional aliases go here
-  	#ServerAlias www.$DOMAIN
-
-cat <<EOF
-
-	# Index file and Document Root (where the public files are located)
-	DocumentRoot $APACHE_DOCROOT/$NAME/
-
-	# Custom log file locations
-	LogLevel warn
-	ErrorLog  $APACHE_DOCROOT/$NAME/log/srvError.log
-	CustomLog $APACHE_DOCROOT/$NAME/log/srvAccess.log combined
-
-	# Index
-	DirectoryIndex index.cfm index.html
-</VirtualHost>
-EOF
-	} > $VHOST_FILE
+		# Lastly, if this is a CREATE run and we haven't done any work, add this file too. 
+		if [ $CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
+		then
+			cd $DIR
+			git add misc/apache.vhost
+			git commit -m "Added Apache virtual host template."
+			cd -
+		fi
+	fi
 fi
 
-#cp $SRC/share/apache_htaccess $DIR/.htaccess
 # vim: ff=unix
