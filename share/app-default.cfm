@@ -25,5 +25,5 @@ Beef this up significantly.
 <cfscript>
 	model = {};
 	model.greeting = "Hello, there!";
-	model.addText = "And welcome to ColdMVC!";
+	model.addText = "And welcome to Myst!";
 </cfscript>
