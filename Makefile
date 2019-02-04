@@ -1,4 +1,4 @@
-# coldmvc - Makefile last updated 
+# myst - Makefile last updated: 
 PREFIX = /usr/local
 SHAREDIR = $(PREFIX)/share
 MANDIR = ${PREFIX}/share/man
@@ -21,7 +21,7 @@ install:
 	-cp -r ./share/$(WILDCARD) $(PREFIX)/share/$(NAME)/
 	-cp ./$(NAME).cfc $(PREFIX)/share/$(NAME)/
 	-cp ./etc/$(NAME).conf $(CONFIG)/
-	-sed -i 's;__PREFIX__;$(PREFIX);' $(CONFIG)/$(NAME).conf 
+	-sed -i -e 's;__PREFIX__;$(PREFIX);' $(CONFIG)/$(NAME).conf 
 
 # uninstall - Uninstall the myst package on a new system
 uninstall:
