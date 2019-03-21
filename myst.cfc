@@ -1614,8 +1614,9 @@ component name="Myst" accessors=true {
 		}
 
 		//Return failure on bad data sources
-		if ( datasource eq "" )
+		if ( datasource eq "" ) {
 			return { status = false, message = "no data source specified." };
+		}
 
 		//Name
 		if ( !structKeyExists( v, "stmtname" ) )

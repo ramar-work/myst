@@ -245,7 +245,7 @@ then
 	fi
 
 	# Replace everything
-	sed "{
+	sed -i -e "{
 		s/__DBNAME__/$DB_NAME/;
 		s/__DBSYMNAME__/$DB_SYMNAME/;
 		s/__DBCONNLIMIT__/$CONF_DBCONNLIMIT/;

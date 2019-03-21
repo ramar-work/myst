@@ -341,26 +341,14 @@ EOF
 
 
 	# If we're on an Apple system, the sed commands will have to be different.
-	if [ $IS_MAC == 1 ]
-	then	
-		sed -i "" "{
-			s/__DATASOURCE__/${DATASOURCE}/
-			s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
-			s;__BASE__;${BASEDIR:-"/"};
-			s/__NAME__/${NAME:-"anon"}/
-			s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
-			s/__TITLE__/${TITLE:-"Titleless Website"}/
-		}" $DIR/data.cfm
-	else
-		sed -i "{
-			s/__DATASOURCE__/${DATASOURCE}/
-			s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
-			s;__BASE__;${BASEDIR:-"/"};
-			s/__NAME__/${NAME:-"anon"}/
-			s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
-			s/__TITLE__/${TITLE:-"Titleless Website"}/
-		}" $DIR/data.cfm
-	fi
+	sed -i -e "{
+		s/__DATASOURCE__/${DATASOURCE}/
+		s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
+		s;__BASE__;${BASEDIR:-"/"};
+		s/__NAME__/${NAME:-"anon"}/
+		s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
+		s/__TITLE__/${TITLE:-"Titleless Website"}/
+	}" $DIR/data.cfm
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
@@ -543,22 +531,37 @@ then
 		{
 	cat <<EOF
 # Apache virtual host for site titled '$NAME', generated `date`
-	<VirtualHost *:80>
-		# Admin email, Server Name (domain name) and any aliases
-		ServerName  $DOMAIN
-		ServerAlias www.$DOMAIN
+<VirtualHost *:80>
+	# Admin email, Server Name (domain name) and any aliases
+	ServerName  $DOMAIN
+	ServerAlias www.$DOMAIN
 
-		# Index file and Document Root (where the public files are located)
-		DocumentRoot $APACHE_DOCROOT/$NAME/
+	# Index file and Document Root (where the public files are located)
+	DocumentRoot $APACHE_DOCROOT/$NAME/
 
-		# Custom log file locations
-		LogLevel warn
-		ErrorLog  $APACHE_DOCROOT/$NAME/log/srvError.log
-		CustomLog $APACHE_DOCROOT/$NAME/log/srvAccess.log combined
+	# Custom log file locations
+	LogLevel warn
+	ErrorLog  $APACHE_DOCROOT/$NAME/log/srvError.log
+	CustomLog $APACHE_DOCROOT/$NAME/log/srvAccess.log combined
+
+EOF
+
+	# Make/add to an .htaccess file
+	if [ $APACHIFY -eq 1 ]
+	then
+			cat <<EOF
+	# Rewrite engine rules
+	RewriteEngine on
+	RewriteRule ^/?([a-z]+)$ \$1.cfm [L]
+
+EOF
+	fi
 
 		# Index
-		DirectoryIndex index.cfm index.html
-	</VirtualHost>
+		cat <<EOF
+	# Auto directory
+	DirectoryIndex index.cfm index.html
+</VirtualHost>
 EOF
 		} > $VHOST_FILE
 

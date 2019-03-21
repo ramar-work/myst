@@ -21,6 +21,9 @@
 # - the above x 2, all problems are solved by managing yourself, and possibly 
 #   going so far as to write a unit file with a different name
 # 
+# - Mac version (and Windows version) will be much easier to use and create if
+#		Apache comes with this program.  The question is, do I build it and ship, or
+#		do I have the user do it?
 # -----------------------------------------------------------------------------
 NAME=`basename $0`
 
@@ -299,7 +302,7 @@ then
 
 	# this is a bug and needs to be fixed:
 	# Lucee does not fix the ports from cli... at all
-	sed -i "{
+	sed -i -e "{
 		s/@@tomcatshutdownport@@/$TOMCAT_SHUTDOWN_PORT/;
 		s/@@tomcatport@@/$TOMCAT_PORT/;
 		s/@@tomcatajpport@@/$TOMCAT_AJP_PORT/;
@@ -337,9 +340,9 @@ then
 
 	# modify httpd conf file
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Modifying main Apache config file...\n"
-	sed -i '$ a # Include CFML settings in one file' $HTTPD_CONFDIR/httpd.conf
-	sed -i '$ a Include conf/extra/httpd-cfml.conf' $HTTPD_CONFDIR/httpd.conf
-	sed -i '{
+	sed -i -e '$ a # Include CFML settings in one file' $HTTPD_CONFDIR/httpd.conf
+	sed -i -e '$ a Include conf/extra/httpd-cfml.conf' $HTTPD_CONFDIR/httpd.conf
+	sed -i -e '{
 		s/User http/User ramar/;
 		s/Group http/Group ramar/;
 		/#LoadModule proxy_module modules\/mod_proxy.so/ s/^#//;
@@ -352,7 +355,7 @@ then
 
 	# modify httpd-cfml.conf
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Updating shared keys for mod CFML...\n"
-	sed -i "s/__MY_SHARED_KEY__/$TOMCAT_SECRET_KEY/" $HTTPD_CONFDIR/extra/httpd-cfml.conf
+	sed -i -e "s/__MY_SHARED_KEY__/$TOMCAT_SECRET_KEY/" $HTTPD_CONFDIR/extra/httpd-cfml.conf
 
 	# modify the virtual host file
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Adding test host...\n"
