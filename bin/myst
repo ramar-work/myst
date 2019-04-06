@@ -131,7 +131,7 @@ do
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
 			shift
-			FOLDER="$1"
+			DIR="$1"
 		;;
 
 
@@ -170,8 +170,9 @@ do
 		# Turn off the defaults
 		--finalize)
 			DO_FINALIZE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -eq 1 && DIR="$2" || DIR=$DIR
 			shift
-			FOLDER="$1"	
 		;;
 
 		# Generate a virtual host file for a particular server configuration
@@ -398,11 +399,11 @@ fi
 if [ $UPDATE -eq 1 ]
 then
 	# Checks 
-	[ ! -z "$FOLDER" ] || err "No application specified for update."
-	[   -d "$FOLDER" ] || \
-		err "The application at folder '$FOLDER' does not seem to exist or is not accessible." 1
-	[   -f "$FOLDER/$SYMNAME.cfc" ] || \
-		err "The application at folder '$FOLDER' does not seem to be a Myst application." 1
+	[ ! -z "$DIR" ] || err "No application specified for update."
+	[   -d "$DIR" ] || \
+		err "The application at folder '$DIR' does not seem to exist or is not accessible." 1
+	[   -f "$DIR/$SYMNAME.cfc" ] || \
+		err "The application at folder '$DIR' does not seem to be a Myst application." 1
 
 	# I don't really need Git to control rollbacks, it's nice, but not necessary
 	[ $VERBOSE -eq 1 ] && echo "Pulling latest copy of $SYMNAME repository."
@@ -410,8 +411,8 @@ then
 	cd /tmp/myst/ && git checkout -b myst && git pull github myst && cd -
 	# TODO: Do a simple HTTP GET for the latest version and untar.  These tools
 	# are more or less guaranteed to be present on a system, whereas Git won't.
-	mv $MV_FLAGS $FOLDER/myst.cfc $FOLDER/myst_.cfc
-	cp $CP_FLAGS /tmp/myst/myst.cfc $FOLDER/
+	mv $MV_FLAGS $DIR/myst.cfc $DIR/myst_.cfc
+	cp $CP_FLAGS /tmp/myst/myst.cfc $DIR/
 	rm -rf /tmp/myst/
 	exit 0
 fi
@@ -589,30 +590,30 @@ fi
 # The finalize command
 if [ $DO_FINALIZE -eq 1 ]
 then
-	[ ! -z "$FOLDER" ] || err "No application specified for finalizing."
-	[   -d "$FOLDER" ] || \
-		err "The application at folder '$FOLDER' does not seem to exist or is not accessible." 1
-	[   -f "$FOLDER/$SYMNAME.cfc" ] || \
-		err "The application at folder '$FOLDER' does not seem to be a Myst application." 1
+	[ ! -z "$DIR" ] || err "No application specified for finalizing."
+	[   -d "$DIR" ] || \
+		err "The application at folder '$DIR' does not seem to exist or is not accessible." 1
+	[   -f "$DIR/$SYMNAME.cfc" ] || \
+		err "The application at folder '$DIR' does not seem to be a Myst application." 1
 
 	# Check that it's not the same
 	#memcmp( );
 	RENAME=0
-	if [ ! -f $FOLDER/app/default.cfm ]
+	if [ ! -f $DIR/app/default.cfm ]
 	then
 		RENAME=1	
 	else
-		DESTFILE=`sum $FOLDER/app/default.cfm | awk '{ print $1 }'`
+		DESTFILE=`sum $DIR/app/default.cfm | awk '{ print $1 }'`
 		SRCFILE=`sum $PREFIX/share/myst/app-default.cfm | awk '{ print $1 }'`
 		[ $DESTFILE -eq $SRCFILE ] && RENAME=1
 	fi
 
 	if [ $RENAME -eq 1 ]
 	then
-		# [[ `cat $FOLDER/app/default.cfm` == `cat $PREFIX.cfm` ]] 
-		mv $MV_FLAGS $FOLDER/app/default.cfm $FOLDER/app/_default.cfm
-		mv $MV_FLAGS $FOLDER/views/default.cfm $FOLDER/views/_default.cfm
-		touch $FOLDER/{app,views}/default.cfm
+		# [[ `cat $DIR/app/default.cfm` == `cat $PREFIX.cfm` ]] 
+		mv $MV_FLAGS $DIR/app/default.cfm $DIR/app/_default.cfm
+		mv $MV_FLAGS $DIR/views/default.cfm $DIR/views/_default.cfm
+		touch $DIR/{app,views}/default.cfm
 	fi	
 fi
 
