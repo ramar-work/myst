@@ -29,7 +29,7 @@ CONF_FILE=/etc/myst.conf
 LIB_FILE=share/myst/mystlib.sh
 
 DIR=
-DO_INSTALL=
+DO_INSTALL=0
 DO_CREATE=0
 #SRC= This will be filled out during the install process...
 SRCDIR=.
@@ -195,6 +195,9 @@ then
 
 	mkdir -pv $DIR/{app,assets,components,db,routes,setup,sql,std,views}/$MODNAME/
 
+	# Set this now
+	SRCDIR=$PREFIX
+
 	for ff in Makefile README.md components/standard.cfc
 	do
 		DASH_COUNT=`echo $MODNAME | sed 's/[0-9,A-Z,a-z]/-/g'`
@@ -206,7 +209,7 @@ then
 			s/__DESCRIPTION__/${DESCRIPTION:-''}/g ;
 			s/__AUTHOR__/${AUTHOR:-''}/g ;
 			s/__USAGE__/${USAGE:-''}/g ;
-		}" $SRCDIR/share/$PROGRAM_NAME/$BASENAME > $DIR/$ff
+		}" $SRCDIR/share/myst/$PROGRAM_NAME/$BASENAME > $DIR/$ff
 	done
 
 	mv -v $DIR/components/standard.cfc $DIR/components/$MODNAME.cfc
