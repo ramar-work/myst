@@ -54,6 +54,7 @@ APACHIFY=0
 ENGINE=
 VHOST_FILE=
 BACKUP_FILE=
+DO_FINALIZE=0
 
 
 # An error function
@@ -87,6 +88,7 @@ Instance options:
 -m, --domain <arg>       Specify a domain name to host this particular instance.
 -d, --description <arg>  Specify a description for the new instance.
 -s, --datasource <arg>   Specify a default datasource for use with the new instance.
+    --finalize <arg>     Finalize a Myst instance.
 
 Modifiers and server-specific options:
     --apache             Create a root-level configuration file compatible with Apache.
@@ -163,6 +165,13 @@ do
 		# Enable the capacity to serve SES URLs via server configuration
 		-e|--ses|--search-engine-safe)
 			DO_SES=1
+		;;
+
+		# Turn off the defaults
+		--finalize)
+			DO_FINALIZE=1
+			shift
+			FOLDER="$1"	
 		;;
 
 		# Generate a virtual host file for a particular server configuration
@@ -575,5 +584,37 @@ EOF
 		fi
 	fi
 fi
+
+
+# The finalize command
+if [ $DO_FINALIZE -eq 1 ]
+then
+	[ ! -z "$FOLDER" ] || err "No application specified for finalizing."
+	[   -d "$FOLDER" ] || \
+		err "The application at folder '$FOLDER' does not seem to exist or is not accessible." 1
+	[   -f "$FOLDER/$SYMNAME.cfc" ] || \
+		err "The application at folder '$FOLDER' does not seem to be a Myst application." 1
+
+	# Check that it's not the same
+	#memcmp( );
+	RENAME=0
+	if [ ! -f $FOLDER/app/default.cfm ]
+	then
+		RENAME=1	
+	else
+		DESTFILE=`sum $FOLDER/app/default.cfm | awk '{ print $1 }'`
+		SRCFILE=`sum $PREFIX/share/myst/app-default.cfm | awk '{ print $1 }'`
+		[ $DESTFILE -eq $SRCFILE ] && RENAME=1
+	fi
+
+	if [ $RENAME -eq 1 ]
+	then
+		# [[ `cat $FOLDER/app/default.cfm` == `cat $PREFIX.cfm` ]] 
+		mv $MV_FLAGS $FOLDER/app/default.cfm $FOLDER/app/_default.cfm
+		mv $MV_FLAGS $FOLDER/views/default.cfm $FOLDER/views/_default.cfm
+		touch $FOLDER/{app,views}/default.cfm
+	fi	
+fi
+
 
 # vim: ff=unix

@@ -128,15 +128,14 @@ do
 		;;
 
 		-n|--name)
-			# Another parameter in data.json
 			shift
 			MODNAME="$1"	
 		;;
 
 		-i|--install)
-			# Another parameter in data.json
+			DO_INSTALL=1	
 			shift
-			MODNAME="$1"	
+			MODITEM="$1"	
 		;;
 
 		--from)
@@ -148,7 +147,7 @@ do
 		--to)
 			# Another parameter in data.json
 			shift
-			MODNAME="$1"	
+			FOLDER="$1"	
 		;;
 
 		-m|--domain)
@@ -230,8 +229,37 @@ fi
 
 if [ $DO_INSTALL -eq 1 ]
 then
-
+	
+	# ...
 	[ -z "$FOLDER" ] && err "$FOLDER unspecified." 
+
+	# Should be able to install either from disk, git or web
+	[ -z "$MODITEM" ] && err "No module name specified."
+
+	printf "Installing $MODITEM into $FOLDER...\n"
+
+	# Git 
+	if [[ ${MODITEM:0:6} == "git://" ]]
+	then
+		printf "Clone from git repo: $MODITEM\n"
+	# you might need to check that the host exists here...
+	# git clone $MODITEM | tar xf - > $FOLDER/
+
+	# Web
+	elif [[ ${MODITEM:0:7} == "http://" ]] ||[[ ${MODITEM:0:8} == "https://" ]] 
+	then
+		printf "Pull from HTTP/HTTPS: $MODITEM\n"
+	# ghostbyname ${MODITEM%%...}  # Just pull the hostname and look
+	# wget -O- $MODITEM | tar xf - > $FOLDER/
+
+	# Assume that this is from a disk 
+	else
+		printf "Copy from disk: $MODITEM\n"
+		stat $MODITEM || err "File $MODITEM not found..."
+	# tar cf $MODITEM | tar xf - > $FOLDER/
+	fi
+
+	# Assume 
 fi
 
 
