@@ -122,6 +122,11 @@ do
 			ENGINE="$1"	
 		;;
 
+		-a|--author)
+			shift
+			AUTHOR="$1"	
+		;;
+
 		-n|--name)
 			# Another parameter in data.json
 			shift
