@@ -30,7 +30,9 @@ LIB_FILE=share/myst/mystlib.sh
 
 DIR=
 DO_INSTALL=0
+DO_UPLOAD=0
 DO_CREATE=0
+DO_COMPRESS=0
 #SRC= This will be filled out during the install process...
 SRCDIR=.
 NO_GIT=0
@@ -226,7 +228,25 @@ then
 fi
 
 
+# Upload files to repo.mystframework.com
+if [ $DO_UPLOAD -eq 1 ]
+then
+	echo ''
+	# Extract the description, name and other things from README.md and tar it and upload it
+	# The user would have to pre-register, so there's that...
+fi
 
+
+
+# Compress a module and it's assets/dependencies
+if [ $DO_COMPRESS -eq 1 ]
+then
+	echo ''
+	tar 2>/dev/null
+fi
+
+
+# Install something to somewhere
 if [ $DO_INSTALL -eq 1 ]
 then
 	
@@ -243,7 +263,8 @@ then
 	then
 		printf "Clone from git repo: $MODITEM\n"
 	# you might need to check that the host exists here...
-	# git clone $MODITEM | tar xf - > $FOLDER/
+	# git clone $MODITEM /tmp/$MODITEM || handle failure
+	# cd /tmp/$MODITEM && ( git --extract-head... | tar xf - -C $FOLDER/ )
 
 	# Web
 	elif [[ ${MODITEM:0:7} == "http://" ]] ||[[ ${MODITEM:0:8} == "https://" ]] 
@@ -256,7 +277,10 @@ then
 	else
 		printf "Copy from disk: $MODITEM\n"
 		stat $MODITEM 1>/dev/null 2>/dev/null || err "File $MODITEM not found..."
-	  tar cf - $MODITEM | tar xf - -C $FOLDER/
+		# Distinguish between files and stuff
+		cd $MODITEM
+		tar cf - . | tar xf - --verbose -C $FOLDER/
+		cd -
 	fi
 
 	# Assume 
