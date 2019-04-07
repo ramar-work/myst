@@ -60,7 +60,7 @@ Creation options:
 -t, --test-on <arg>     Compresses the current Git HEAD and applies to a Myst instance. 
 
 Install options:
--i, --install <arg>     Specify which folder to use when creating a new module.
+-i, --install <arg>     Choose a module to install.
     --from <arg>        Choose folder or file where the project may be. (BETA)
     --to <arg>          Install the extension to <arg> 
 
@@ -255,8 +255,8 @@ then
 	# Assume that this is from a disk 
 	else
 		printf "Copy from disk: $MODITEM\n"
-		stat $MODITEM || err "File $MODITEM not found..."
-	# tar cf $MODITEM | tar xf - > $FOLDER/
+		stat $MODITEM 1>/dev/null 2>/dev/null || err "File $MODITEM not found..."
+	  tar cf - $MODITEM | tar xf - -C $FOLDER/
 	fi
 
 	# Assume 
