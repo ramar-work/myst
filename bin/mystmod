@@ -271,7 +271,7 @@ then
 	then
 		printf "Pull from HTTP/HTTPS: $MODITEM\n"
 	# ghostbyname ${MODITEM%%...}  # Just pull the hostname and look
-	# wget -O- $MODITEM | tar xf - > $FOLDER/
+		wget -O- $MODITEM | tar xzf - --verbose -C $FOLDER/
 
 	# Assume that this is from a disk 
 	else
