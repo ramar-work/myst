@@ -439,24 +439,6 @@ component name="Myst" accessors=true {
  * --------------------------------------------------------------------- */
 
 	/**
-	 * loadView 
- 	 *
-	 * Load a page and evaluate the code within it as a view.
-   * TODO	
-	 * - Add try/catch
- 	 * - Play with template caching, since copying is pretty slow
-	 */
-	private function loadView( String filename ) {
-		var src;
-		var dest = "newfilename.cfm";
-		src = FileRead( filename & ".cfm" );
-		src = "<cfoutput>#src#</cfoutput>";
-		FileWrite( dest, src );
-		return 1;	
-	}
-
-
-	/**
 	 * check_deep_key 
  	 *
 	 * Check in structs for elements
@@ -771,11 +753,7 @@ component name="Myst" accessors=true {
 		var resultSet;
 
 		//Check for either string or filename
-		var cFilename = StructKeyExists( arguments, "filename" );
-		var cString = StructKeyExists( arguments, "string" );
-		var cQuery = StructKeyExists( arguments, "query" );
-
-		if ( !cFilename && !cString ) {
+		if ( !StructKeyExists( arguments, "filename" ) && !StructKeyExists( arguments, "string" ) ) {
 			return { 
 				status= false, 
 				message= "Either 'filename' or 'string' must be present as an argument to this function."
@@ -783,15 +761,11 @@ component name="Myst" accessors=true {
 		}
 
 		//Make sure data source is a string
-		if ( !cQuery ) {
-			if ( !IsSimpleValue( arguments.datasource ) ) {
-				return { status= false, message= "The datasource argument is not a string." };
-			}
+		if ( !IsSimpleValue( arguments.datasource ) )
+			return { status= false, message= "The datasource argument is not a string." };
 
-			if ( arguments.datasource eq "" ) {
-				return { status= false, message= "The datasource argument is blank."};
-			}
-		}
+		if ( arguments.datasource eq "" )
+			return { status= false, message= "The datasource argument is blank."};
 
 		//Then check and process the SQL statement
 		if ( StructKeyExists( arguments, "string" ) ) {
@@ -844,14 +818,9 @@ component name="Myst" accessors=true {
 		}
 
 		//Set up a new Query
-		if ( !cQuery )
-			q = new Query( name="#Name#", datasource="#arguments.datasource#" );	
-		else {
-			q = new Query( name="#Name#", dbtype = "query" );
-			q.setAttributes( _mem_ = arguments.query );
-		}
-
-		//q.setName = "#Name#";
+		q = new Query( datasource="#arguments.datasource#" );	
+		q.setname = "#Name#";
+		//q.setdatasource = arguments.datasource;
 
 		//If binds exist, do the binding dance 
 		if ( StructKeyExists( arguments, "bindArgs" ) ) {
@@ -1168,6 +1137,14 @@ component name="Myst" accessors=true {
 		variables.myst    = MystInstance;
 		variables.data    = MystInstance.app;
 		//variables.db      = MystInstance.app.data;
+
+		//At this point, all the components should have been loaded...
+		try {
+
+		}
+		catch (any e) {
+
+		}
 		
 		//Find the right resource.
 		try {
@@ -1175,7 +1152,34 @@ component name="Myst" accessors=true {
 			logReport("Evaluating URL route");
 
 			//Negotiate search engine safety
-			//ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
+			var ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
+			//writedump(appdata);
+		
+			//TODO: Seems like all aliasing needs to be handled here.	
+			//NOTE: Right now, let's handle api/ calls, b/c they're needed 
+			//to make pluggable AJAX work.
+			if ( Left( Replace( ses_path, appdata.base, "" ), 4 ) == "api/" ) {
+				//Just invoke whatever thing is there...
+				//Myst is initialized, and I don't need views and whatnot...
+				//TODO: The evaluation chain ( exec models, exec views, etc ) needs to be
+				//abstracted into it's own function, then choosing an rvalue won't be limited
+				//to one place.
+				try {
+					include ses_path;
+				}
+				catch (any e ) {
+					//could be 404, could be 500, could even be 40x (auth errors)
+					//writedump( e );
+					if ( e.type == 'missinginclude' )
+						sendAsJson( status=0, httpStatus=404, content="Resource #ses_path# not found." );
+					else {
+						sendAsJson( status=0, httpStatus=500, content="Exception occurred.", exception=e );
+					}
+				}
+				abort;
+			}
+
+			//writeoutput( "Got: #ses_path#" );  abort;
 
 			//Set some short names in case we need to access the page name for routing purposes
 			setRname( resourceIndex( name=cgi.script_name, rl=appdata ) );
@@ -1645,8 +1649,9 @@ component name="Myst" accessors=true {
 		}
 
 		//Return failure on bad data sources
-		if ( datasource eq "" )
+		if ( datasource eq "" ) {
 			return { status = false, message = "no data source specified." };
+		}
 
 		//Name
 		if ( !structKeyExists( v, "stmtname" ) )

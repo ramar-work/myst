@@ -1,0 +1,21 @@
+# Apache virtual host for site titled 'piedmont', generated Sat May 11 11:48:03 EDT 2019
+<VirtualHost *:80>
+	# Admin email, Server Name (domain name) and any aliases
+	ServerName  piedmont.local
+	ServerAlias www.piedmont.local
+
+	# Index file and Document Root (where the public files are located)
+	DocumentRoot /srv/http/piedmont/
+
+	# Custom log file locations
+	LogLevel warn
+	ErrorLog  /srv/http/piedmont/log/srvError.log
+	CustomLog /srv/http/piedmont/log/srvAccess.log combined
+
+	# Rewrite engine rules
+	RewriteEngine on
+	RewriteRule ^/?([a-z]+)$ $1.cfm [L]
+
+	# Auto directory
+	DirectoryIndex index.cfm index.html
+</VirtualHost>

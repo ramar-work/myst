@@ -1,0 +1,3 @@
+# .htaccess for site titled 'piedmont', generated Sat May 11 11:48:03 EDT 2019
+RewriteEngine on
+RewriteRule ^/?([a-z]+)$ $1.cfm [L]
