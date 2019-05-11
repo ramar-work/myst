@@ -1151,13 +1151,13 @@ component name="Myst" accessors=true {
 			//Add more to logging
 			logReport("Evaluating URL route");
 
-			//Negotiate search engine safety
-			var ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
-			//writedump(appdata);
-		
 			//TODO: Seems like all aliasing needs to be handled here.	
-			//NOTE: Right now, let's handle api/ calls, b/c they're needed 
-			//to make pluggable AJAX work.
+			var ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
+
+			//Use this to catch /api/ requests that have no pages yet.
+			// if ( Len( Replace( ses_path, appdata.base, "" ) == 4 ) { ; }
+
+			//Invoke API endpoints directly
 			if ( Left( Replace( ses_path, appdata.base, "" ), 4 ) == "api/" ) {
 				//Just invoke whatever thing is there...
 				//Myst is initialized, and I don't need views and whatnot...

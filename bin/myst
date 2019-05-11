@@ -311,7 +311,7 @@ EOF
 
 	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
-	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,log,misc,routes,setup,sql,std,views}/
+	mkdir $MKDIR_FLAGS $DIR/{api,app,assets,components,db,files,log,misc,routes,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,js}/
 	mkdir $MKDIR_FLAGS $DIR/db/static/
 	mkdir $MKDIR_FLAGS $DIR/std/custom/
@@ -331,7 +331,7 @@ EOF
 
 	# Set up Application redirects
 	[ $VERBOSE -eq 1 ] && printf "\n* Setting up redirects...\n"
-	for _d in app components db log files misc routes setup sql std views
+	for _d in api app components db log files misc routes setup sql std views
 	do 
 		[ $VERBOSE -eq 1 ] && echo cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
 		cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
@@ -375,6 +375,7 @@ EOF
 *
 
 # Explicitly add the framework's directories
+!api/*
 !app/*
 !assets/{css,js}/*
 !components/*
