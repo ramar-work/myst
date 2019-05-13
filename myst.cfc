@@ -171,6 +171,9 @@ component name="Myst" accessors=true {
 	//The resource name that's been loaded
 	property name="rname" type="string";
 
+	//Test mode
+	property name="apiAutodie" type="boolean" default=1;
+
 	//The datasource that will be used during the life of the app.
 	property name="datasource" type="string";
 
@@ -206,6 +209,9 @@ component name="Myst" accessors=true {
 
 	//Relative path maps for framework directories
 	property name="constantMap" type="struct"; 
+
+	//Relative path maps for framework directories
+	property name="urlBase" type="string" default="/"; 
 
 //	this.root_dir = getDirectoryFromPath(getCurrentTemplatePath());
 //	this.current  = getCurrentTemplatePath();
@@ -401,7 +407,7 @@ component name="Myst" accessors=true {
 		//Create a file name on the fly.
 		var a;
 		var cm = getConstantMap();
-		var fp = cm["/files"]; 
+		var fp = cm[ "files" ]; 
 		fp = ToString(Left(fp, Len(fp) - 1)); 
 		
 		//Upload it.
@@ -1095,7 +1101,7 @@ component name="Myst" accessors=true {
 	 *
 	 * Send a struct back wrapped as a JSON object.
 	 */
-	public function sendAsJson ( ) {
+	public string function sendAsJson ( ) {
 		var a = {};
 		var pc;
 
@@ -1114,10 +1120,15 @@ component name="Myst" accessors=true {
 
 		//TODO: Use contentHandler(...) to send back with application/json	
 		a = SerializeJSON( a );
-		pc = getpagecontext().getResponse();
-		pc.setContentType( "application/json" );
-		writeoutput( a );
-		abort;
+		if ( !getApiAutodie() )
+			writeoutput( a );
+		else {
+			pc = getpagecontext().getResponse();
+			pc.setContentType( "application/json" );
+			writeoutput( a );
+			abort;
+		}
+		return a;
 	}
 
 
@@ -1138,12 +1149,23 @@ component name="Myst" accessors=true {
 		variables.data    = MystInstance.app;
 		//variables.db      = MystInstance.app.data;
 
-		//At this point, all the components should have been loaded...
+		//Load all the components should have been loaded...
 		try {
+			logReport( "Load components" );
 
+			//Go through all the components in the components directory
+			var dir = "components";
+			var dirQuery = DirectoryList( "components", false, "query", "" );
+			for ( var q in dirQuery ) {
+				if ( q.name neq "Application.cfc" ) {
+					var vv = Replace( q.name, ".cfc", "" );
+					var m = MystInstance;
+					variables[ vv ] = createObject( "component", "components.#vv#" ).init( m );
+				}
+			}
 		}
 		catch (any e) {
-
+			renderPage( status=500, content="Component load failed.", err=e );
 		}
 		
 		//Find the right resource.
@@ -1151,25 +1173,18 @@ component name="Myst" accessors=true {
 			//Add more to logging
 			logReport("Evaluating URL route");
 
-			//TODO: Seems like all aliasing needs to be handled here.	
-			var ses_path = (check_deep_key( appdata, "settings", "ses" )) ? cgi.path_info : cgi.script_name;
+			//TODO: All aliasing needs to be handled here.	
+			var ses_path = (check_deep_key( appdata, "settings", "ses" )) 
+				? cgi.path_info : cgi.script_name;
 
-			//Use this to catch /api/ requests that have no pages yet.
-			// if ( Len( Replace( ses_path, appdata.base, "" ) == 4 ) { ; }
-
-			//Invoke API endpoints directly
+			//Invoke API endpoints directly, bypass MVC loading routines with Myst
 			if ( Left( Replace( ses_path, appdata.base, "" ), 4 ) == "api/" ) {
-				//Just invoke whatever thing is there...
-				//Myst is initialized, and I don't need views and whatnot...
-				//TODO: The evaluation chain ( exec models, exec views, etc ) needs to be
-				//abstracted into it's own function, then choosing an rvalue won't be limited
-				//to one place.
+				//TODO: Abstract 'models' and 'views' loading
 				try {
 					include ses_path;
 				}
 				catch (any e ) {
 					//could be 404, could be 500, could even be 40x (auth errors)
-					//writedump( e );
 					if ( e.type == 'missinginclude' )
 						sendAsJson( status=0, httpStatus=404, content="Resource #ses_path# not found." );
 					else {
@@ -1178,8 +1193,6 @@ component name="Myst" accessors=true {
 				}
 				abort;
 			}
-
-			//writeoutput( "Got: #ses_path#" );  abort;
 
 			//Set some short names in case we need to access the page name for routing purposes
 			setRname( resourceIndex( name=cgi.script_name, rl=appdata ) );
@@ -1592,7 +1605,7 @@ component name="Myst" accessors=true {
 				}
 			
 				//Upload the file
-				file = _upload_file( ck, acceptedMimes );
+				file = upload_file( ck, acceptedMimes );
 
 				if ( file.status ) {
 					//Check extensions if acceptedMimes is not a wildcard
@@ -1809,6 +1822,10 @@ component name="Myst" accessors=true {
 			setAppdata( manifest );
 			//appdata = CreateObject( "component", "data" );
 			appdata = getAppdata();
+
+			//All of the properties in data.cfm (or data.cfc) should
+			//show up here...
+			setUrlBase( appdata.base );
 			logReport( "Success" );
 		}
 		catch (any e) {
