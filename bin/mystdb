@@ -30,6 +30,7 @@ DB_SYMNAME=
 DB_USER=
 DB_PWD=
 DB_REMOTEHOST=
+DB_PORt=
 FOLDER=
 
 REMOTE_HOST=
@@ -38,6 +39,7 @@ DO_MYSQL=0
 DO_MSSQL=0
 
 DO_VERBOSE=0
+DO_GLOBAL=0
 DO_CREATE=0
 DO_GENERATE=0
 
@@ -47,7 +49,7 @@ CONF_DBUSERNAME=
 CONF_DBPASSWORD=
 CONF_DBPORT=
 DATASOURCE_FILE=
-
+TMPFILE=/tmp/app.cfc
 
 # An error function
 err() {
@@ -73,6 +75,7 @@ $PROGRAM_NAME:
 -p, --postgres          Assume the source is a PostgreSQL data source.
 -m, --mysql             Assume the source is a MySQL data source.
 -s, --mssql             Assume the source is a Microsoft SQL server data source.
+    --global            Create the datasource globally versus in one locked down context.
 -v, --verbose           Be verbose.
 -h, --help              Show help.
 EOF
@@ -141,6 +144,10 @@ do
 			shift
 			DB_REMOTEHOST="$1"
 		;;
+		--global)	
+			err "--global argument is not yet supported." 1
+			DO_GLOBAL=1	
+		;;
 		-p|--postgres)	
 			DO_POSTGRES=1
 		;;
@@ -181,11 +188,27 @@ DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
 DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
 
 
+# Do not continue if global and no folder specified.
+if [ $DO_GLOBAL -ne 1 ] 
+then
+	[ -z "$FOLDER" ] && \
+		err "No myst instance specified.  (Try --folder \$DBNAME)." 1
+
+	[ ! -d "$FOLDER" ] && \
+		err "Myst instance specified does not exist..." 1
+fi
+
 # We can optionally create the datasource if it's running.
 # On Linux, these are just their own servers.
 if [ $DO_CREATE -eq 1 ]
 then
-	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
+	[ -z "$DB_NAME" ] && \
+		err "No database name specified.  (Try --name \$DBNAME)." 1
+
+	[ -z "$DB_USER" ] && \
+		err "No database user specified.  (Try --user \$USERNAME)." 1
+
+
 	# who to do this as most likely.
 	if [ $DO_POSTGRES -eq 1 ]
 	then
@@ -195,17 +218,20 @@ then
 
 	if [ $DO_MYSQL -eq 1 ]
 	then
-		printf ''
+		# if there's a password, use it
+		mysql -u $DB_USER -e "CREATE DATABASE $DB_NAME"	
 	fi
 
 
 	if [ $DO_MSSQL -eq 1 ]
 	then
-		printf ''
+		# -U user
+		# -P pass
+		# -S server 
+		# -Q execute and stop
+		sqlcmd -U $DB_USER -Q "CREATE DATABASE $DB_NAME"	
 	fi
 
-	# Actually invoke SQL client and do an upload.
-	# ...
 fi
 
 
@@ -221,8 +247,43 @@ then
 	[ -z "$DB_USER" ] && \
 		err "No database user specified.  (Try --user \$USERNAME)." 1
 
-	[ -z "$DB_PWD" ] && \
-		err "No database password specified for user.  (Try --password \$PASSWORD)." 1
+	#[ -z "$DB_PWD" ] &&
+		#err "No database password specified for user.  (Try --password \$PASSWORD)." 1
+
+	# Check for Application.cfc	
+	[ ! -f "$FOLDER/Application.cfc" ] && \
+		err "No Application.cfc found at instance '$FOLDER'" 1
+
+	# Find the start of the component 
+	# TODO: note that this does not support non-script components
+	STARTLINE=`grep --line-number 'component {' $FOLDER/Application.cfc | \
+		awk -F ':' '{ print $1 }'`
+	[ -z "$STARTLINE" ] && \
+		err "Could not find component declaration at Application.cfc in '$FOLDER'" 1
+
+	# Check for any data source strings, and try not to blow them away
+	DS_EXISTS=`grep 'BEGIN: mystdb' $FOLDER/Application.cfc >/dev/null && echo 1 || echo 0`
+	if [ $DS_EXISTS -eq 1 ]
+	then 
+		err "found mystdb datasource" 1
+		# make a copy
+		# delete the original one
+	fi
+
+	# Check for any data source strings, and try not to blow them away
+	DS_DECL=`grep 'this.datasources' $FOLDER/Application.cfc >/dev/null && echo 1 || echo 0`
+	DS_STARTSTRING=
+	DS_ENDSTRING=
+	echo $DS_DECL
+	if [ $DS_DECL -eq 0 ]
+	then
+		DS_STARTSTRING="this.datasources = {"
+		DS_ENDSTRING="}"
+	fi
+
+	# Make a backup here...
+	cp $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
+	# NOTE: (if only there were a way to test and made sure things worked...)
 
 	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
 	# who to do this as most likely.
@@ -231,19 +292,97 @@ then
 		printf ''
 	fi
 
+	# Add the datasource string...
+	{
+
+	# Assemble the file differently...
+	sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc >> $TMPFILE
 
 	if [ $DO_MYSQL -eq 1 ]
 	then
-		printf ''
+		# a full mysql datasource looks like this:
+		# ---
+		# this.datasources["rcdb"] = {
+		# 	  class: 'com.mysql.jdbc.Driver'
+		# 	, bundleName: 'com.mysql.jdbc'
+		# 	, bundleVersion: '5.1.40'
+		# 	, connectionString: 'jdbc:mysql://localhost:3306/rcdb?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=round&tinyInt1isBit=false&autoReconnect=false&jdbcCompliantTruncation=false&allowMultiQueries=true&useLegacyDatetimeCode=true'
+		# 	, username: 'adam'
+		# 	, password: "encrypted:77007680f0a139ebc51fead12332d09b8e0a495236f2e3ff973489aebab6acf1"
+		# 	
+		# 	// optional settings
+		# 	, blob:true // default: false
+		# 	, clob:true // default: false
+		# 	, connectionLimit:100 // default:-1
+		# };
+
+		# Print out a block...
+		DB_REMOTEHOST=localhost
+		DB_PORT=3306
+		cat <<EOF
+	$DS_STARTSTRING
+		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
+		"$DB_SYMNAME" = {
+				class: 'org.gjt.mm.mysql.Driver'
+			, connectionString: 'jdbc:mysql://$DB_REMOTEHOST:$DB_PORT/$DB_NAME?useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true'
+			, username: '$DB_USER'
+			, password: '$DB_PWD'
+		};
+		//mystdb END
+	$DS_ENDSTRING	
+EOF
 	fi
 
 
 	if [ $DO_MSSQL -eq 1 ]
 	then
-		# Generate a 
-		printf ''
+		# A full MSSQL datasource will look something like this...
+		# ----
+		# this.datasources["cwnetdb"] = {
+		# 	  class: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
+		# 	, bundleName: 'mssqljdbc4'
+		# 	, bundleVersion: '4.0.2206.100'
+		# 	, connectionString: 'jdbc:sqlserver://localhost:1433;DATABASENAME=cw_netdb;sendStringParametersAsUnicode=true;SelectMethod=direct'
+		# 	, username: 'SA'
+		# 	, password: "encrypted:909d4f7eb7f2777dffd72775ce8f7ba7f89af5b477428d06fd114f599601b258"
+		# 	
+		# 	// optional settings
+		# 	, blob:yes // default: false
+		# 	, clob:yes // default: false
+		# 	, connectionLimit:100 // default:-1
+		# 	, storage:yes // default: false
+		# };
+		# Print out a block...
+		DB_REMOTEHOST=localhost
+		DB_PORT=1433
+		# This needs to be encrypted and salted... (and prefixed w/ the word 'encrypted:')
+		DB_PASS=$DB_PWD
+		DB_CONNLIMIT=-1
+
+		cat <<EOF
+	$DS_STARTSTRING
+		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
+		"$DB_SYMNAME" = {
+				class: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
+			, bundleName: 'mssqljdbc4'
+			, bundleVersion: '4.0.2206.100'
+			, connectionString: 'jdbc:sqlserver://$DB_REMOTEHOST:$DB_PORT;DATABASENAME=$DB_NAME;sendStringParametersAsUnicode=true;SelectMethod=direct'
+			, username: '$DB_USER'
+			, password: '$DB_PWD'
+			, connectionLimit: $DB_CONNLIMIT 
+		};
+		//mystdb END
+	$DS_ENDSTRING
+EOF
 	fi
 
+	# Append the rest of the file to stdout
+	sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc 
+	} >> $TMPFILE 
+
+
+
+	if [ 0 -eq 1 ]; then
 	# Replace everything
 	sed -i -e "{
 		s/__DBNAME__/$DB_NAME/;
@@ -253,4 +392,5 @@ then
 		s/__DBPASSWORD__/$DB_PWD/;
 		s/__DBPORT__/$CONF_DBPORT/;
 	}" $DATASOURCE_FILE
+	fi
 fi
