@@ -30,13 +30,14 @@ DB_SYMNAME=
 DB_USER=
 DB_PWD=
 DB_REMOTEHOST=
-DB_PORt=
+DB_PORT=
 FOLDER=
 
 REMOTE_HOST=
 DO_POSTGRES=0
 DO_MYSQL=0
 DO_MSSQL=0
+DO_DRYRUN=0
 
 DO_VERBOSE=0
 DO_GLOBAL=0
@@ -76,6 +77,7 @@ $PROGRAM_NAME:
 -m, --mysql             Assume the source is a MySQL data source.
 -s, --mssql             Assume the source is a Microsoft SQL server data source.
     --global            Create the datasource globally versus in one locked down context.
+    --dry-run           Do a dry run, change no files.
 -v, --verbose           Be verbose.
 -h, --help              Show help.
 EOF
@@ -148,6 +150,9 @@ do
 			err "--global argument is not yet supported." 1
 			DO_GLOBAL=1	
 		;;
+		--dry-run)	
+			DO_DRYRUN=1
+		;;
 		-p|--postgres)	
 			DO_POSTGRES=1
 		;;
@@ -186,6 +191,13 @@ done
 [ $DO_MSSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-1433}; DBSUFFIX="mssql"; }
 DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
 DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
+
+
+# 
+if [ $DO_DRYRUN -eq 1 ]
+then
+	TMPFILE=/dev/stdout
+fi
 
 
 # Do not continue if global and no folder specified.
@@ -296,7 +308,7 @@ then
 	{
 
 	# Assemble the file differently...
-	sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc >> $TMPFILE
+	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc
 
 	if [ $DO_MYSQL -eq 1 ]
 	then
@@ -377,7 +389,7 @@ EOF
 	fi
 
 	# Append the rest of the file to stdout
-	sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc 
+	[ $DO_DRYRUN -eq 0 ] && sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc 
 	} >> $TMPFILE 
 
 

@@ -20,8 +20,9 @@ All Application.cfc rules are specified here.
  --->
 component {
 
-	//Make sure that this is set via getters and setters or at least variables
+	//TODO: Consider getter/setter for elements like this
 	this.sessionManagement = true;
+
 
 	function onRequestStart (string Page) {
 		//application.data = DeserializeJSON(FileRead(this.jsonManifest, "utf-8"));
@@ -30,28 +31,24 @@ component {
 		}
 	}
 
+
 	function onRequest (string targetPage) {
 		try {
-			//include arguments.targetPage;
 			include "index.cfm";
 		} 
 		catch (any e) {
-			//This bypasses onError
-			writedump( e ); abort;
+			writedump( e ); 
+			abort;
 		}
 	}
 
+
 	function onError (required any Exception, required string EventName) {
-		//writedump(Exception);
 		e = Exception;
-
-		//These shouldn't be needed
-		//abort;
-
+		//...
 		if ( StructKeyExists( e, "TagContext" ) ) {
 			//Short note the tag with the information.
 			av = e.TagContext[ 0 ];
-			//writeoutput( e.TagContext.line );
 
 			//Better exception handling is needed here....
 			status_code    = 500;
@@ -63,13 +60,15 @@ component {
 				"</ul>";
 				av.codePrintHTML &
 
-				"Page '" & arguments.targetPage & "' does not exist.";
+				"Page '" & arguments.targetPage & "' does not exist."
+			;
 			include "std/5xx-view.cfm";
 		}
 	
 		//abort;
 		include "failure.cfm";
 	}
+
 
 	function onMissingTemplate (string Page) {
 		include "index.cfm";
