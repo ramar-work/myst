@@ -200,21 +200,13 @@ then
 	[ $DO_GENERATE -eq 0 ] && [ $DO_CREATE -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
 fi
 
+
 # 
 if [ $DO_DRYRUN -eq 1 ]
 then
 	TMPFILE=/dev/stdout
 fi
 
-# Do not continue if global and no folder specified.
-if [ $DO_GLOBAL -ne 1 ] 
-then
-	[ -z "$FOLDER" ] && \
-		err "No myst instance specified.  (Try --folder \$DBNAME)." 1
-
-	[ ! -d "$FOLDER" ] && \
-		err "Myst instance specified does not exist..." 1
-fi
 
 # We can optionally create the datasource if it's running.
 # On Linux, these are just their own servers.
@@ -253,9 +245,20 @@ then
 fi
 
 
+
 # Generate a datasource
 if [ $DO_GENERATE -eq 1 ]
 then
+	# Do not continue if global and no folder specified.
+	if [ $DO_GLOBAL -ne 1 ] 
+	then
+		[ -z "$FOLDER" ] && \
+			err "No myst instance specified.  (Try --folder \$DBNAME)." 1
+
+		[ ! -d "$FOLDER" ] && \
+			err "Myst instance specified does not exist..." 1
+	fi
+
 	[ -z "$DATASOURCE_FILE" ] && \
 		err "No database backend specified. (Use --mysql, --mssql, or --postgresql to specify one)." 1
 
@@ -296,7 +299,7 @@ then
 	if [ $DS_DECL -eq 0 ]
 	then
 		DS_STARTSTRING="this.datasources = {"
-		DS_ENDSTRING="}"
+		DS_ENDSTRING="};"
 	fi
 
 	# Make a backup here...
@@ -389,7 +392,7 @@ EOF
 			, username: '$DB_USER'
 			, password: '$DB_PWD'
 			, connectionLimit: $DB_CONNLIMIT 
-		};
+		}
 		//mystdb END
 	$DS_ENDSTRING
 EOF
