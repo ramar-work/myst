@@ -1769,6 +1769,82 @@ component name="Myst" accessors=true {
 		return v; 
 	}
 
+	/**
+	 * setupdatasource( file )
+	 *
+	 * Setup a datasource when using an extension.
+   */
+	public void function setupdatasource ( Required string file, string module, string rettype, string datasource ) {
+		var fname; 
+		var fbuf;
+		var res;
+		var ds;
+
+		//if this is part of a module, handle that
+		if ( StructKeyExists( arguments, "module" ) )
+			fname = "setup/#arguments.module#/#arguments.file#";
+		else {
+			fname = "setup/#arguments.file#";
+		}
+
+		//choose a datasource
+		if ( StructKeyExists( arguments, "datasource" ) )
+			ds = arguments.datasource;
+		else {
+
+			//Instantiate Application just to see where things are
+			//TODO: There must be a way to just get the ds name...
+			var a = createObject("component","Application" );
+
+			//check in application scope for ds, then other places
+			if ( StructKeyExists( a, "datasource" ) )
+			{
+sendResponse(status=200,mime="text/html",content="application.datasource = #a.datasource#" );
+			}
+			else if ( StructKeyExists( a, "defaultdatasource" ) )
+			{
+sendResponse(status=200,mime="text/html",content="application.defaultdatasource = #a.defaultdatasource#" );
+
+			}
+			else if ( StructKeyExists( a, "datasources" ) ) {
+				//unless myst has run, if there is only one ds there...
+				//this should probably use it...
+				//load application.datasources and if only one member, 
+				//use that....
+				if ( StructCount( a.datasources ) gt 1 ) {
+					sendResponse(status=500,mime="text/html",content="No default datasource was found.  Additionally, there is more than one datasource specified for this instance.  Please explicitly denote which one to use when setting up." );
+				}
+
+				//crudely loop to get the first index	
+				for ( var tds in a.datasources ) {
+					ds = tds;
+					break;
+				}
+
+			}
+		}
+
+		//check for the file
+		if ( !FileExists( fname ) ) {
+			sendResponse(status=500, mime="text/html", content="Couldn't find setup file for #module#");
+		}
+			 
+		//open it and read it's content
+		fbuf = FileRead( fname );
+
+		//execute as a query (I guess a big ass string)
+		res = dbExec(
+			string = fbuf
+		, datasource = ds 
+		);
+	
+		//return a status
+		if ( !res.status ) 
+			sendResponse( status=500, mime="text/html", content="Failed to create datasource for #module# at #getDatasource()#" );	
+		else {
+			sendResponse( status=200, mime="text/html", content="All is well" );	
+		}
+	}
 
 	/**
 	 * init()

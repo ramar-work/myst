@@ -39,7 +39,7 @@ DO_MYSQL=0
 DO_MSSQL=0
 DO_DRYRUN=0
 
-DO_VERBOSE=0
+VERBOSE=0
 DO_GLOBAL=0
 DO_CREATE=0
 DO_GENERATE=0
@@ -180,6 +180,13 @@ do
 done
 
 
+# Set all the verbose flags...
+CPFLAGS=
+if [ $VERBOSE -eq 1 ] 
+then
+	CPFLAGS="-v"
+fi
+
 
 # Include the file and check that prefix exists
 [ ! -d $PREFIX ] && err "$PROPNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
@@ -303,7 +310,7 @@ then
 	fi
 
 	# Make a backup here...
-	[ $DO_DRYRUN -eq 0 ] && cp $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
+	[ $DO_DRYRUN -eq 0 ] && cp $CPFLAGS $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
 	# NOTE: (if only there were a way to test and made sure things worked...)
 
 	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
@@ -312,6 +319,10 @@ then
 	then
 		printf ''
 	fi
+
+	# set the write path of the new file
+	# TODO: Even with the shell, there is a way to write to memory...
+	# TMPFILE="$FOLDER/Application.cfc"	
 
 	# Assemble the file differently...
 	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc > $TMPFILE
@@ -347,7 +358,7 @@ then
 			, connectionString: 'jdbc:mysql://$DB_REMOTEHOST:$DB_PORT/$DB_NAME?useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true'
 			, username: '$DB_USER'
 			, password: '$DB_PWD'
-		};
+		}
 		//mystdb END
 	$DS_ENDSTRING	
 EOF
@@ -402,6 +413,8 @@ EOF
 	# Append the rest of the file to stdout
 	[ $DO_DRYRUN -eq 0 ] && sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc  >> $TMPFILE
 
+	# Copy the file for real 
+	[ $DO_DRYRUN -eq 0 ] && cp $CPFLAGS $TMPFILE $FOLDER/Application.cfc	
 
 	if [ 0 -eq 1 ]; then
 	# Replace everything
