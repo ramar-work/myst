@@ -29,9 +29,11 @@ CONF_FILE=/etc/myst.conf
 LIB_FILE=share/myst/mystlib.sh
 
 DIR=
+ADDR=
 DO_INSTALL=0
 DO_UPLOAD=0
 DO_CREATE=0
+DO_SETUP=0
 DO_COMPRESS=0
 #SRC= This will be filled out during the install process...
 SRCDIR=.
@@ -71,6 +73,10 @@ Metadata options:
 -d, --description <arg>  Specify a description for the new module.
     --datasource <arg>   Specify a default datasource for use with the new instance.
 
+Post-install options:
+    --address <arg>      Specify a web address of an instance for completing module setup.
+    --setup              Run module setup routines.
+
 -v, --verbose            Be verbose.
 -h, --help               Show this help and quit.
 USAGES
@@ -96,6 +102,17 @@ source $PREFIX/$LIB_FILE
 while [ $# -gt 0 ]
 do
 	case "$1" in
+		# Specify a web address to help the install process
+		-a|--address)
+			shift
+			ADDR="$1"
+		;;
+
+		# Administration stuff
+		--setup)
+			DO_SETUP=1
+		;;
+
 		# Administration stuff
 		-c|--create)
 			DO_CREATE=1
@@ -194,7 +211,7 @@ then
 	test ! -z $MODNAME || err "No module name specified." 1
 	test ! -z $DIR || err "No directory specified." 1
 
-	mkdir -pv $DIR/{app,assets,components,db,routes,setup,sql,std,views}/$MODNAME/
+	mkdir -pv $DIR/{api,app,assets,components,db,routes,setup,sql,std,views}/$MODNAME/
 
 	# Set this now
 	SRCDIR=$PREFIX
@@ -283,14 +300,15 @@ then
 		cd -
 	fi
 
-	# Assume 
+	# Complete any setup of any kind
+	if [ $DO_SETUP -eq 1 ]
+	then
+		[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
+		wget "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+	fi
 fi
 
 
-exit
-
-
-
-
+exit 0
 #cp $SRC/share/apache_htaccess $DIR/.htaccess
 # vim: ff=unix

@@ -324,6 +324,7 @@ EOF
 	cp $CP_FLAGS $SHAREDIR/app-default.cfm $DIR/app/default.cfm
 	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
 	cp $CP_FLAGS $SHAREDIR/failure.cfm $DIR/std/
+	cp $CP_FLAGS $SHAREDIR/setup.cfm $DIR/api/
 	cp $CP_FLAGS $SHAREDIR/{4xx,5xx,mime,html}-view.cfm $DIR/std/
 	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/
 	[ $VERBOSE -eq 1 ] && echo DONE!
@@ -331,7 +332,7 @@ EOF
 
 	# Set up Application redirects
 	[ $VERBOSE -eq 1 ] && printf "\n* Setting up redirects...\n"
-	for _d in api app components db log files misc routes setup sql std views
+	for _d in app components db log files misc routes setup sql std views
 	do 
 		[ $VERBOSE -eq 1 ] && echo cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
 		cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc

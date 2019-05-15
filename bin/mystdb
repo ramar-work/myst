@@ -355,7 +355,7 @@ then
 		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
 		"$DB_SYMNAME" = {
 				class: 'org.gjt.mm.mysql.Driver'
-			, connectionString: 'jdbc:mysql://$DB_REMOTEHOST:$DB_PORT/$DB_NAME?useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true'
+			, connectionString: 'jdbc:mysql://$DB_REMOTEHOST:$DB_PORT/$DB_NAME?useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true&allowMultiQueries=true'
 			, username: '$DB_USER'
 			, password: '$DB_PWD'
 		}

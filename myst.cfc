@@ -1840,7 +1840,7 @@ sendResponse(status=200,mime="text/html",content="application.defaultdatasource 
 	
 		//return a status
 		if ( !res.status ) 
-			sendResponse( status=500, mime="text/html", content="Failed to create datasource for #module# at #getDatasource()#" );	
+			sendResponse( status=500, mime="text/html", content="Failed to create data tables for #module# at #getDatasource()#" );	
 		else {
 			sendResponse( status=200, mime="text/html", content="All is well" );	
 		}
