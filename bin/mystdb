@@ -193,12 +193,18 @@ DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
 DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
 
 
+# Check that actions and types have been received...
+if [ 1 -eq 1 ]
+then
+	[ $DO_MYSQL -eq 0 ] && [ $DO_POSTGRES -eq 0 ] && [ $DO_MSSQL -eq 0 ] && err "No database backend chosen." 1
+	[ $DO_GENERATE -eq 0 ] && [ $DO_CREATE -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
+fi
+
 # 
 if [ $DO_DRYRUN -eq 1 ]
 then
 	TMPFILE=/dev/stdout
 fi
-
 
 # Do not continue if global and no folder specified.
 if [ $DO_GLOBAL -ne 1 ] 
@@ -286,7 +292,7 @@ then
 	DS_DECL=`grep 'this.datasources' $FOLDER/Application.cfc >/dev/null && echo 1 || echo 0`
 	DS_STARTSTRING=
 	DS_ENDSTRING=
-	echo $DS_DECL
+	#echo $DS_DECL
 	if [ $DS_DECL -eq 0 ]
 	then
 		DS_STARTSTRING="this.datasources = {"
@@ -294,7 +300,7 @@ then
 	fi
 
 	# Make a backup here...
-	cp $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
+	[ $DO_DRYRUN -eq 0 ] && cp $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
 	# NOTE: (if only there were a way to test and made sure things worked...)
 
 	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
@@ -304,12 +310,10 @@ then
 		printf ''
 	fi
 
-	# Add the datasource string...
-	{
-
 	# Assemble the file differently...
-	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc
+	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc > $TMPFILE
 
+	# Add the datasource string...
 	if [ $DO_MYSQL -eq 1 ]
 	then
 		# a full mysql datasource looks like this:
@@ -330,7 +334,8 @@ then
 
 		# Print out a block...
 		DB_REMOTEHOST=localhost
-		DB_PORT=3306
+		DB_PORT=3306		
+		{
 		cat <<EOF
 	$DS_STARTSTRING
 		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
@@ -343,6 +348,7 @@ then
 		//mystdb END
 	$DS_ENDSTRING	
 EOF
+		} >> $TMPFILE
 	fi
 
 
@@ -371,6 +377,7 @@ EOF
 		DB_PASS=$DB_PWD
 		DB_CONNLIMIT=-1
 
+		{
 		cat <<EOF
 	$DS_STARTSTRING
 		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
@@ -386,12 +393,11 @@ EOF
 		//mystdb END
 	$DS_ENDSTRING
 EOF
+	} >> $TMPFILE 
 	fi
 
 	# Append the rest of the file to stdout
-	[ $DO_DRYRUN -eq 0 ] && sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc 
-	} >> $TMPFILE 
-
+	[ $DO_DRYRUN -eq 0 ] && sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc  >> $TMPFILE
 
 
 	if [ 0 -eq 1 ]; then
