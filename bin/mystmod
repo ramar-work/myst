@@ -76,6 +76,7 @@ Metadata options:
 Post-install options:
     --address <arg>      Specify a web address of an instance for completing module setup.
     --setup              Run module setup routines.
+-o, --module <arg>       Load this module during setup if running setup by itself.
 
 -v, --verbose            Be verbose.
 -h, --help               Show this help and quit.
@@ -153,6 +154,11 @@ do
 
 		-i|--install)
 			DO_INSTALL=1	
+			shift
+			MODITEM="$1"	
+		;;
+
+		-o|--module)
 			shift
 			MODITEM="$1"	
 		;;
@@ -299,16 +305,16 @@ then
 		tar cf - . | tar xf - --verbose -C $FOLDER/
 		cd -
 	fi
-
-	# Complete any setup of any kind
-	if [ $DO_SETUP -eq 1 ]
-	then
-		[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
-		[ $VERBOSE -eq 1 ] && echo "wget $ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
-		wget -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
-	fi
 fi
 
+# Complete any setup of any kind
+if [ $DO_SETUP -eq 1 ]
+then
+	[ -z "$MODITEM" ] && err "Can't setup unnamed package (use --module)" 1
+	[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
+	[ $VERBOSE -eq 1 ] && echo "wget $ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+	wget -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+fi
 
 exit 0
 #cp $SRC/share/apache_htaccess $DIR/.htaccess
