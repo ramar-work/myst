@@ -2,25 +2,32 @@
 
 # anything's possible
 
+# some variables
+SITENAME=director.local
+SITEDIR=/srv/http/$SITENAME
+DB=director_db
+DBPREFIX=ddb_
+HTTPDROOT=/etc/httpd/conf/extra
+REPO=/srv/http/repo.mystframework.local/repo
 
 # use regular script rules to set up and tear down things
 
 if [ 1 -eq 1 ]
 then
 	rm -rf /srv/http/shalamar.local
-	mysql -u root -e 'drop database shalamar_db' 2>/dev/null
+	mysql -u root -e "drop database $DB" 2>/dev/null
 	echo 'priming sudo command'
 	sudo printf '' > /dev/null
-	[ -L /etc/httpd/conf/extra/vhosts-enabled/shalamar.local ] && sudo rm /etc/httpd/conf/extra/vhosts-enabled/shalamar.local
-	[ -f /etc/httpd/conf/extra/vhosts-available/shalamar.local ] && sudo rm /etc/httpd/conf/extra/vhosts-available/shalamar.local
+	[ -L $HTTPDROOT/vhosts-enabled/$SITENAME ] && sudo rm $HTTPDROOT/vhosts-enabled/$SITENAME
+	[ -f $HTTPDROOT/vhosts-available/$SITENAME ] && sudo rm $HTTPDROOT/vhosts-available/$SITENAME
 fi
 
 
 if [ 1 -eq 1 ]
 then
 
-	echo 'myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource shalamar_db'
-	myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource shalamar_db
+	echo "myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource $DB"
+	myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource $DB
 	read
 
 # Why does a name need to specified?
@@ -29,29 +36,33 @@ then
 	read
 
 # Activate this for use with Apache
-	echo 'sudo cp /srv/http/shalamar.local/misc/apache.vhost /etc/httpd/conf/extra/vhosts-available/shalamar.local'
-	sudo cp /srv/http/shalamar.local/misc/apache.vhost /etc/httpd/conf/extra/vhosts-available/shalamar.local
-	echo 'sudo ln -s /etc/httpd/conf/extra/vhosts-available/shalamar.local /etc/httpd/conf/extra/vhosts-enabled/'
-	sudo ln -s /etc/httpd/conf/extra/vhosts-available/shalamar.local /etc/httpd/conf/extra/vhosts-enabled/
+	echo "sudo cp /srv/http/$SITENAME/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME"
+	sudo cp /srv/http/$SITENAME/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME
+	echo "sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/"
+	sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/
 
 # Create a datasource
-	echo 'mystdb --create --generate -f /srv/http/shalamar.local --mysql --verbose --name shalamar_db --user root'
-	mystdb --create --generate -f /srv/http/shalamar.local --mysql --verbose --name shalamar_db --user root
+	echo "mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root"
+	mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root
+
+# echo 'examine the generated datasource'
+#	less $SITEDIR/Application.cfc 
 	read
 
 # Finally, restart the server
-	echo 'sudo systemctl restart httpd && sudo systemctl restart lucee'
+	echo "sudo systemctl restart httpd && sudo systemctl restart lucee"
 	sudo systemctl restart httpd && sudo systemctl restart lucee
+	echo "Done..."
 	read
 
 # Add a module (cms)... 
-	echo 'mystmod --install /srv/http/repo.mystframework.local/repo/cms --to /srv/http/shalamar.local'
-	mystmod --install /srv/http/repo.mystframework.local/repo/cms --to /srv/http/shalamar.local
+	echo "mystmod --install $REPO/cms --to $SITEDIR"
+	mystmod --install $REPO/cms --to $SITEDIR
 	read
 
 # ...and set it up
-	echo 'mystmod --setup --address http://shalamar.local'
-	mystmod --setup --address http://shalamar.local
+	echo "mystmod --setup --address http://$SITENAME --module cms"
+	mystmod --setup --address http://$SITENAME --module cms
 	read
 
 fi
@@ -60,11 +71,11 @@ fi
 if [ 1 -eq 1 ]
 then
 # Is the instance there?
-	[ -d /srv/http/shalamar.local ] || echo "TEST FAILED: Failed to create instance..." 
+	[ -d $SITEDIR ] || echo "TEST FAILED: Failed to create instance..." 
 # Is the datasource specified in the instance?
-	[ ! -z `grep shalamar_db /srv/http/shalamar.local/Application.cfc 2>/dev/null` ] || echo "TEST FAILED: Failed to add datasource..." 
+	[ ! -z "`grep $DB $SITEDIR/Application.cfc 2>/dev/null`" ] || echo "TEST FAILED: Failed to add datasource..." 
 # Can I get a packet from the server?
-	wget -O- http://shalamar.local
+	wget -O- http://$SITENAME
 # Did MySQL load tables?
-	mysql -u root -e 'use shalamar_db; show tables;'
+	mysql -u root -e "use $DB; show tables;"
 fi

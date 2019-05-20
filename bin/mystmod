@@ -313,7 +313,8 @@ then
 	[ -z "$MODITEM" ] && err "Can't setup unnamed package (use --module)" 1
 	[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
 	[ $VERBOSE -eq 1 ] && echo "wget $ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
-	wget -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+	# Let's see the header and response text on the command line, cut any leading spaces or tabs
+	wget --quiet -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM" | sed 's/^[\t, ]//g'
 fi
 
 exit 0
