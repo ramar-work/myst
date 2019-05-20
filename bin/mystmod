@@ -40,7 +40,7 @@ SRCDIR=.
 NO_GIT=0
 ERR_NODIR=1
 ERR_NONAME=2
-DO_VERBOSE=0
+VERBOSE=0
 
 
 # An error function
@@ -247,7 +247,7 @@ then
 		cd -
 	fi
 
-	[ $DO_VERBOSE -eq 1 ] && printf "Successfully created module '$MODNAME'\n" 
+	[ $VERBOSE -eq 1 ] && printf "Successfully created module '$MODNAME'\n" 
 fi
 
 

@@ -23,27 +23,33 @@ then
 fi
 
 
+
 if [ 1 -eq 1 ]
 then
 
-	echo "myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource $DB"
-	myst --create --name shalamar.local -f /srv/http/shalamar.local -m shalamar.local --ses --apache --description "Yet another test site." --datasource $DB
+	echo "myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB"
+	myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB
+	echo "Done..."
 	read
 
 # Why does a name need to specified?
-	echo 'myst --folder /srv/http/shalamar.local --finalize'
-	myst --folder /srv/http/shalamar.local --finalize
+	echo "myst --folder $SITEDIR --finalize"
+	myst --folder $SITEDIR --finalize
+	echo "Done..."
 	read
 
 # Activate this for use with Apache
-	echo "sudo cp /srv/http/$SITENAME/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME"
-	sudo cp /srv/http/$SITENAME/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME
+	echo "sudo cp $SITEDIR/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME"
+	sudo cp $SITEDIR/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME
 	echo "sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/"
 	sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/
+	echo "Done..."
+	read
 
 # Create a datasource
 	echo "mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root"
 	mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root
+	echo "Done..."
 
 # echo 'examine the generated datasource'
 #	less $SITEDIR/Application.cfc 
@@ -58,14 +64,18 @@ then
 # Add a module (cms)... 
 	echo "mystmod --install $REPO/cms --to $SITEDIR"
 	mystmod --install $REPO/cms --to $SITEDIR
+	echo "Done..."
 	read
 
 # ...and set it up
 	echo "mystmod --setup --address http://$SITENAME --module cms"
 	mystmod --setup --address http://$SITENAME --module cms
+	echo "Done..."
 	read
 
 fi
+
+
 
 # Check that everything took
 if [ 1 -eq 1 ]
