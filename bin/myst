@@ -530,6 +530,7 @@ then
 	if [ $APACHIFY -eq 1 ]
 	then
 		# Get some configuration details
+		httpd -t -D DUMP_RUN_CFG || err "Apache is misconfigured on this system... Can't generate virtualhost."
 		APACHE_DOCROOT="`httpd -t -D DUMP_RUN_CFG 2>/dev/null| grep 'DocumentRoot:' | awk '{ print $3 }' | sed 's/"//g' `" 
 
 		# Name should probably not be turned off

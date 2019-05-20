@@ -14,12 +14,14 @@ REPO=/srv/http/repo.mystframework.local/repo
 
 if [ 1 -eq 1 ]
 then
-	rm -rf /srv/http/shalamar.local
+	echo 'Cleaning up leftover test files...'
+	rm -rfv $SITEDIR
 	mysql -u root -e "drop database $DB" 2>/dev/null
 	echo 'priming sudo command'
 	sudo printf '' > /dev/null
 	[ -L $HTTPDROOT/vhosts-enabled/$SITENAME ] && sudo rm $HTTPDROOT/vhosts-enabled/$SITENAME
 	[ -f $HTTPDROOT/vhosts-available/$SITENAME ] && sudo rm $HTTPDROOT/vhosts-available/$SITENAME
+	echo 'Done...'
 fi
 
 
@@ -30,6 +32,7 @@ then
 	echo "myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB"
 	myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB
 	echo "Done..."
+	exit
 	read
 
 # Why does a name need to specified?
@@ -47,8 +50,8 @@ then
 	read
 
 # Create a datasource
-	echo "mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root"
-	mystdb --create --generate -f $SITEDIR --mysql --verbose --name $DB --user root
+	echo "mystdb --create --generate --folder $SITEDIR --mysql --verbose --name $DB --user root"
+	mystdb --create --generate --folder $SITEDIR --mysql --verbose --name $DB --user root
 	echo "Done..."
 
 # echo 'examine the generated datasource'
