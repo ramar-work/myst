@@ -304,7 +304,8 @@ then
 	if [ $DO_SETUP -eq 1 ]
 	then
 		[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
-		wget "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+		[ $VERBOSE -eq 1 ] && echo "wget $ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
+		wget -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
 	fi
 fi
 

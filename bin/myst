@@ -171,6 +171,7 @@ do
 		--finalize)
 			DO_FINALIZE=1
 			CODE=`detFlag "$2"`;
+			# If it's -1, what does that mean again?
 			test $CODE -eq 1 && DIR="$2" || DIR=$DIR
 			shift
 		;;

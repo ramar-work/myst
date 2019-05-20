@@ -1787,6 +1787,11 @@ component name="Myst" accessors=true {
 			fname = "setup/#arguments.file#";
 		}
 
+		//check for the file
+		if ( !FileExists( fname ) ) {
+			sendResponse(status=500, mime="text/html", content="Couldn't find setup file for #module#");
+		}
+			 
 		//choose a datasource
 		if ( StructKeyExists( arguments, "datasource" ) )
 			ds = arguments.datasource;
@@ -1824,11 +1829,6 @@ sendResponse(status=200,mime="text/html",content="application.defaultdatasource 
 			}
 		}
 
-		//check for the file
-		if ( !FileExists( fname ) ) {
-			sendResponse(status=500, mime="text/html", content="Couldn't find setup file for #module#");
-		}
-			 
 		//open it and read it's content
 		fbuf = FileRead( fname );
 
