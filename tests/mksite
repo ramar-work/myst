@@ -16,7 +16,7 @@ if [ 1 -eq 1 ]
 then
 	echo 'Cleaning up leftover test files...'
 	rm -rfv $SITEDIR
-	mysql -u root -e "drop database $DB" 2>/dev/null
+	mysql --verbose -u root -e "drop database $DB" 2>/dev/null
 	echo 'priming sudo command'
 	sudo printf '' > /dev/null
 	[ -L $HTTPDROOT/vhosts-enabled/$SITENAME ] && sudo rm $HTTPDROOT/vhosts-enabled/$SITENAME
@@ -32,7 +32,6 @@ then
 	echo "myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB"
 	myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB
 	echo "Done..."
-	exit
 	read
 
 # Why does a name need to specified?
