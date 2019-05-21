@@ -253,7 +253,6 @@ component name="Myst" accessors=true {
 		}
 		return cms.routeInfo;
 	}
-
 	
 	//Log messages and return true
 	private Boolean function plog ( String message, String loc ) {
@@ -1168,6 +1167,37 @@ component name="Myst" accessors=true {
 			renderPage( status=500, content="Component load failed.", err=e );
 		}
 		
+		//route injection should happen here...
+		try {
+			//check the routes folder for pretty much anything
+			//var callstat = _include( where = "routes", name = "cms" );
+			//a: json
+			/*
+			var cont = FileRead( "routes/cms.json" );
+			var j = DeserializeJSON( cont );
+writedump(j);
+			*/
+			//easier to load this as something else... or a component
+			//b: cfscript eval'd on the fly
+			//var cont = FileRead( "routes/cms.cf" );
+			//var k = Evaluate(cont);
+			//c: explilcitly scoping the routes with 'data.routes'
+			var callstat = _include( where = "routes", name = "cms" );
+			//d: some kind of component invocation (this is unnecessarily compicated though)
+			//it has the benefit of being able to sit in memory and only be refreshed when
+			//explicitly told to
+			//e: super crude route addition via namespaced variables
+			/*
+			if ( isDefined( "cms" & "_routes" ) ) {
+				for ( var rtName in cms_routes ) {
+				}	
+			}	
+			*/
+		}
+		catch (any e) {
+			renderPage( status=500, content="route injection failed.", err=e );
+		}
+
 		//Find the right resource.
 		try {
 			//Add more to logging
@@ -1195,151 +1225,102 @@ component name="Myst" accessors=true {
 			}
 
 			//Set some short names in case we need to access the page name for routing purposes
-			setRname( resourceIndex( name=cgi.script_name, rl=appdata ) );
+			var rd = findResource( name=cgi.script_name, rl=appdata );
+//writedump(rd);abort;
+			setRname( rd.file /*resourceIndex( name=cgi.script_name, rl=appdata )*/ );
 			variables.data.loaded = variables.data.page = resName = getRname();
 
 			//Send a 404 page and be done if this resource was not specified in
 			//data.cfm.
-			(resName eq "0") ? renderPage( status=404, content="Resource not found.", err={} ) : 0;
+			//(resName eq "0") ? renderPage( status=404, content="Resource not found.", err={} ) : 0;
+			if ( rd.status eq 404 ) {
+				renderPage( status=404, content="Resource not found.", err={} ); 
+			}
+	
 			logReport( "Success" );
 		}
 		catch (any e) {
 			renderPage( status=500, content="Locating resource mapping failed.", err=e );
 		}
 
-	
-		//Evaluate resources in the 'models/' directory and get a snapshot of the
-		//variables scope. 
+
 		try {
-			logReport( "Evaluating models..." );
+			//Get the original scope before running anything
 			oScope = ListSort( StructKeyList( variables ), "textNoCase" );
-			var callStat=0; 
-			var pageArray=0;
-			var ev;
 
-			//Find an alternate route model first.
-			if ( check_deep_key(appdata, "routes", resName, "model") ) {
-				logReport("Evaluate alternative mapped to route name.");
+			logReport( "Evaluating models..." );
+			//I need to check that the value is  string or an array
+			//The nI need to figure out how to run whatever it is (file, string, etc)
+			ev = checkArrayOrString( rd, "model" );
 
-				//Get the type name
-				ev = checkArrayOrString( appdata.routes[resName], "model" );
-
-				//Stop first if struct models are requested 
-				//if ( ev.type == "struct" )
-				if ( ev.type != "string" && ev.type != "array" )
-					renderPage( status=500, content="Model value at '#resName#' was not an array or string.", err={} );
-
-				//Set pageArray if it's string or array
-				pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
-
-				//Now load each model, should probably put these in a scope
-				for ( var x in ev.value ) {
-					callStat = _include( where="app", name=x );
-					if ( !callStat.status ) {
-						//plog( ... )
-						renderPage( status=500, content="Error executing model #x#", err=callStat.errors );
-					}
-				}
+			//structs allow me to run 'query', 'string', and possibly function
+			//TODO: Add struct handling capability, then calling component methods as models is easy
+			if ( ev.type != "string" && ev.type != "array" ) {
+				renderPage( 
+					status=500
+				, content="Model value at '#rd.file#' was not an array or string."
+				, err={} 
+				);
 			}
 
-			//Match routes following the convention { "x": {} }
-			else if (check_deep_key(appdata, "routes", resName) && StructIsEmpty(appdata.routes[resName])) {
-				plog( "Evaluate route name." );
-				callStat = _include( where="app", name=resName ); 
+			//Set pageArray if it's string or array
+			var pageArray = ( ev.type == 'string' ) ? [ ev.value ] : ev.value;
+
+			//Now load each model, should probably put these in a scope
+			for ( var x in pageArray ) {
+				callStat = _include( where="app", name=x );
 				if ( !callStat.status ) {
 					//plog( ... )
-					renderPage( status=500, content="Error executing model '#resName#'", err=callStat.errors );
+					renderPage( status=500, content="Error executing model #x#", err=callStat.errors );
 				}
 			}
-		
-			//Match the default route	
-			else {
-				//Check that coldmvc.default() has been defined
-				if ( structKeyExists(this, "default") ) {
-					plog( "Evaluating this.default()" );
-					this.default();
-				}
-				else if ( check_file("app", "default") ) {
-					plog( "Evaluating app/default.cfm" ); 
-					callStat = _include( where="app", name="default" ); 
-					if ( !callStat.status ) {
-						//plog( ... )
-						renderPage( status=500, content="Error executing default route.", err=callStat.errors );
-					}
-				}
-				else {
-					renderPage( status=500, content="No default route or file found for this app.", err={} );
-				}
-			}
-			logReport( "Success");
-		}
+
+		} 
 		catch (any e) {
 			//Manually wrap the error template here.
 			renderPage(status=500, err=e, content = "Error executing model." );
 		}
 
-		//Query global scope again and check for what's changed 
+		//This is supposed to help me trim scopes...
 		nScope = ListSort( structKeyList( variables ), "textNoCase" );
 		lScope = ListToArray( ListSort( ReplaceList( nScope, oScope,
 			REReplace( oScope, "[a-zA-Z0-9_]", "", "all" ) ), "textNoCase", "asc", ",") ); 
 
-		//Dump the "model" if asked
-		if ( 0 ) {
-			for ( var vv in lScope ) writedump( variables[ vv ] ); 
-		}
-
-		//Then parse the template
 		try {
-			//Try to reorganize all of this so that the conditions stack in a more sensible way
 			logReport( "Evaluating views..." );
 			var callStat=0; 
 			var pageArray=0;
 			var ev;
-			
-			//Save content to make it easier to serve alternate mimetypes.
 			savecontent variable="cms.content" {
-				//Check if something called view exists first	 
-				if (check_deep_key(appdata, "routes", resName, "view")) {
-					//Get the type name
-					ev = checkArrayOrString( appdata.routes[resName], "view" );
+				//Get the type name
+				ev = checkArrayOrString( rd, "view" );
 
-					//Custom message is needed here somewhere...
-					if ( ev.type != "string" && ev.type != "array" )
-						renderPage( status=500, content="View value for '#resName#' was not a string or array.", err={} );
-
-					//Set pageArray if it's string or array
-					pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
-
-					//Now load each model, should probably put these in a scope
-					for ( var x in ev.value ) {
-						callStat = _include( where="views", name=x );
-						if ( !callStat.status ) {
-							//plog( ... )
-							renderPage( status=500, content="Error loading view at page '#x#'.", err=callStat.errors );
-						}
-					}
+				//Custom message is needed here somewhere...
+				if ( ev.type != "string" && ev.type != "array" ) {
+					renderPage( 
+						status=500
+					, err={} 
+					, content="View value for '#rd.file#' was not a string or array."
+					);
 				}
-				else if (check_deep_key(appdata, "routes", resName) && StructIsEmpty(appdata.routes[resName])) {
-					logReport( "Load view with same name as route." );
-					callStat = _include( where="views" , name=resName );
+
+				//Set pageArray if it's string or array
+				pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
+
+				//Now load each model, should probably put these in a scope
+				for ( var x in pageArray ) {
+					callStat = _include( where="views", name=x );
 					if ( !callStat.status ) {
-						//plog( ... )
-						renderPage( status=500, content="Error loading view at page '#resName#'.", err=callStat.errors );
-					}
-				}
-				else {
-					logReport( "Load default view." );
-					callStat = _include( where="views", name="default" );
-					if ( !callStat.status ) {
-						renderPage( status=500, content="Error loading default view for app.", err=callStat.errors );
+						renderPage( status=500, content="Error loading view at page '#x#'.", err=callStat.errors );
 					}
 				}
 			}
-			logReport("Success");
-		}
+		} 
 		catch (any e) {
-			renderPage( status=500, content="Error in parsing view.", err=e );
+			//Manually wrap the error template here.
+			renderPage( status=500, err=e, content="Error in parsing view." );
 		}
+
 
 		// Evaluate any post functions (not sure what these would be yet)
 		if ( !StructKeyExists( appdata, "post" ) ) 
@@ -1371,6 +1352,119 @@ component name="Myst" accessors=true {
 	}
 
 
+	/*
+
+	private struct function findResource ( Required String name, Required Struct rl ) {
+
+	why not return with some smart things from here?
+	404 is if something can't be found
+
+	- combine the path as you go down, b/c you need to check for files later on, 
+
+	status = 200, 404, etc
+	path = path as we go through the thing
+
+
+	*/
+	private struct function findResource ( Required String name, Required Struct rl ) {
+		//Define a base here
+		var base = "default";
+		var localName;
+
+		//Handle situations where no routes are defined.
+		if ( !structKeyExists( rl, "routes" ) || StructIsEmpty( rl.routes ) ) {
+			return base;
+		}
+
+		//Modify model and view include paths if there is a basedir present.
+		if ( StructKeyExists( rl, "base" ) ) {
+			if ( Len( rl.base ) > 1 )
+				base = rl.base;	
+			else if ( Len(rl.base) == 1 && rl.base == "/" )
+				base = "/";
+			else {
+				base = rl.base;	
+			}
+		}
+
+		//Simply lop the basedir off of the requested URL if that was requested
+		if ( StructKeyExists(rl, "base") ) {
+			localName = Replace( arguments.name, base, "" );
+		}
+
+		/*
+		//Check for resources in GET or the CGI.stringpath 
+		if ( StructKeyExists(rl, "handler") && CompareNoCase(rl.handler, "get") == 0 ) {
+			if ( isDefined("url") and isDefined("url.action") )
+				name = url.action;
+			else {
+				if (StructKeyExists(rl, "base")) {
+					name = Replace(name, base, "");
+				}
+			}
+		}
+		else {
+			//Cut out only routes that are relevant to the current application.
+			if ( StructKeyExists(rl, "base") ) {
+				name = Replace( name, base, "" );
+			}
+		}
+		*/
+
+		//Handle the default route if rl is not based off of URL
+		if ( !StructKeyExists( rl, "handler" ) && localName == "index.cfm" ) {
+			return rl.routes.default;
+		}
+
+		/*
+		writeoutput("at route evaluator:" );
+		writedump( "localName: #localName#" );
+		writedump( ListToArray( localName, "/" ) );
+		//writedump( rl.routes );
+		*/
+
+		//This is the second version, die out and return
+		//Chopping from the top, until we stop, is the best thing...
+		var t = rl.routes;
+		var et = {};
+		var path = "";
+		var file;
+		var l = ListToArray( localName, "/" );
+
+		//to make this easy, something EXPLICIT needs to catch
+		for ( var x in l ) {
+			var fn = Replace( x, ".cfm", "" );
+			if ( StructKeyExists( t, x ) ) {
+				t = t[ x ];
+				path = ListAppend( path, x, "/" );
+				file = x;
+			}
+			else if ( StructKeyExists( t, fn ) ) {
+				t = t[ fn ];
+				path = ListAppend( path, fn, "/" );
+				file = fn;
+			}
+			/*
+			'*' wildcard catch	
+			regex catch
+			*/
+			else {
+				//writeoutput("<h2>we died</h2>" );
+				return { 
+					status=404
+				, path=path
+				, file=x
+				};
+			}
+		}
+
+		t.file = file;
+		t.path = Left( path, Len(path) - Len(file) );
+		t.status = 200;
+		return t;	
+	}
+
+
 	/**
 	 * resourceIndex 
 	 *
@@ -1397,8 +1491,10 @@ component name="Myst" accessors=true {
 		}
 
 		//Simply lop the basedir off of the requested URL if that was requested
-		if ( StructKeyExists(rl, "base") )
+		if ( StructKeyExists(rl, "base") ) {
 			localName = Replace( arguments.name, base, "" );
+		}
+
 		/*
 		//Check for resources in GET or the CGI.stringpath 
 		if ( StructKeyExists(rl, "handler") && CompareNoCase(rl.handler, "get") == 0 ) {
@@ -1419,16 +1515,25 @@ component name="Myst" accessors=true {
 		*/
 
 		//Handle the default route if rl is not based off of URL
-		if ( !StructKeyExists(rl, "handler") && localName == "index.cfm" )
+		if ( !StructKeyExists( rl, "handler" ) && localName == "index.cfm" ) {
 			return "default";
+		}
 
+		/*
+		writeoutput("at route evaluator:" );
+		writedump( "localName: #localName#" );
+		writedump( ListToArray( localName, "/" ) );
+		writedump( rl.routes );
+		*/
+
+		//This is the first version
 		//If you made it this far, search for the requested endpoint
-		for (var x in rl.routes) {
+		for ( var x in rl.routes ) {
 			if ( localName == x || Replace(localName, ".cfm", "" ) == x ) {
 				return x;
 			}
 		}
-
+	
 		//You probably found nothing, so either do 404 or some other stuff.
 		return ToString(0);
 	}
@@ -1873,7 +1978,7 @@ sendResponse(status=200,mime="text/html",content="application.defaultdatasource 
 		constantMap = {}; 
 		setRootDir( rootDir );
 		setCurrentDir( currentDir );
-		setArrayConstantMap( [ "app", "assets", "bindata", "db", "files", "sql", "std", "views" ] );
+		setArrayConstantMap( [ "app", "assets", "db", "files", "routes", "sql", "std", "views" ] );
 		setPathSep( ( server.os.name eq "Windows" ) ? "\" : "/" );
 		for ( var k in getArrayConstantMap() ) constantMap[ k ] = rootDir & k;
 		setConstantMap( constantMap );
