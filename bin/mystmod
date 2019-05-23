@@ -30,7 +30,11 @@ LIB_FILE=share/myst/mystlib.sh
 
 DIR=
 ADDR=
+EXTRACT_DIR=
+MERGE_DIR=
 DO_INSTALL=0
+DO_EXTRACT=0
+DO_MERGE=0
 DO_UPLOAD=0
 DO_CREATE=0
 DO_SETUP=0
@@ -65,6 +69,7 @@ Creation options:
 
 Install options:
 -i, --install <arg>     Choose a module to install.
+-e, --extract <arg>     Extract a potential module's files from a live instance.
     --from <arg>        Choose folder or file where the project may be. (BETA)
     --to <arg>          Install the extension to <arg> 
 
@@ -109,6 +114,12 @@ do
 			ADDR="$1"
 		;;
 
+		# This is for something
+		--directory)
+			shift
+			EXTRACT_DIR="$1"
+		;;
+
 		# Administration stuff
 		--setup)
 			DO_SETUP=1
@@ -136,10 +147,11 @@ do
 			DIR="$1"
 		;;
 
-		-e|--engine)
+		-e|--extract)
 			# Specify which engine so the right virtual host file will be generated
+			DO_EXTRACT=1
 			shift
-			ENGINE="$1"	
+			MODNAME="$1"
 		;;
 
 		-a|--author)
@@ -152,10 +164,11 @@ do
 			MODNAME="$1"	
 		;;
 
+		# This is just going to be the name...
 		-i|--install)
 			DO_INSTALL=1	
 			shift
-			MODITEM="$1"	
+			MODNAME="$1"	
 		;;
 
 		-o|--module)
@@ -164,9 +177,8 @@ do
 		;;
 
 		--from)
-			# Another parameter in data.json
 			shift
-			MODNAME="$1"	
+			MODPATH="$1"
 		;;
 
 		--to)
@@ -212,6 +224,7 @@ do
 done
 
 
+# The create routines.
 if [ $DO_CREATE -eq 1 ]
 then
 	test ! -z $MODNAME || err "No module name specified." 1
@@ -260,7 +273,6 @@ then
 fi
 
 
-
 # Compress a module and it's assets/dependencies
 if [ $DO_COMPRESS -eq 1 ]
 then
@@ -272,40 +284,45 @@ fi
 # Install something to somewhere
 if [ $DO_INSTALL -eq 1 ]
 then
-	
-	# ...
-	[ -z "$FOLDER" ] && err "$FOLDER unspecified." 
+	# The folder where we're going to put the module
+	[ -z "$FOLDER" ] && err "No folder specified to put the new module." 1
+
+	# Not now, but I will need this in the future to locate paths 
+	[ -z "$MODNAME" ] && err "No module name specified." 1
 
 	# Should be able to install either from disk, git or web
-	[ -z "$MODITEM" ] && err "No module name specified."
+	[ -z "$MODPATH" ] && err "No module path specified." 1
 
-	printf "Installing $MODITEM into $FOLDER...\n"
+	# A pretty message
+	[ $VERBOSE -eq 1 ] && printf "Installing $MODNAME into $FOLDER (from $MODPATH)...\n"
 
 	# Git 
-	if [[ ${MODITEM:0:6} == "git://" ]]
+	if [[ ${MODPATH:0:6} == "git://" ]]
 	then
-		printf "Clone from git repo: $MODITEM\n"
+		printf "Clone from git repo: $MODPATH\n"
 	# you might need to check that the host exists here...
-	# git clone $MODITEM /tmp/$MODITEM || handle failure
-	# cd /tmp/$MODITEM && ( git --extract-head... | tar xf - -C $FOLDER/ )
+	# git clone $MODPATH /tmp/$MODITEM || handle failure
+	# cd /tmp/$MODPATH && ( git --extract-head... | tar xf - -C $FOLDER/ )
 
 	# Web
-	elif [[ ${MODITEM:0:7} == "http://" ]] ||[[ ${MODITEM:0:8} == "https://" ]] 
+	elif [[ ${MODPATH:0:7} == "http://" ]] ||[[ ${MODITEM:0:8} == "https://" ]] 
 	then
-		printf "Pull from HTTP/HTTPS: $MODITEM\n"
-	# ghostbyname ${MODITEM%%...}  # Just pull the hostname and look
-		wget -O- $MODITEM | tar xzf - --verbose -C $FOLDER/
+		printf "Pull from HTTP/HTTPS: $MODPATH\n"
+	# ghostbyname ${MODPATH%%...}  # Just pull the hostname and look
+		wget -O- $MODPATH | tar xzf - --verbose -C $FOLDER/
 
 	# Assume that this is from a disk 
 	else
-		printf "Copy from disk: $MODITEM\n"
-		stat $MODITEM 1>/dev/null 2>/dev/null || err "File $MODITEM not found..."
+		printf "Copy from disk: $MODPATH\n"
+exit
+		stat $MODPATH 1>/dev/null 2>/dev/null || err "File $MODITEM not found..."
 		# Distinguish between files and stuff
-		cd $MODITEM
+		cd $MODPATH
 		tar cf - . | tar xf - --verbose -C $FOLDER/
 		cd -
 	fi
 fi
+
 
 # Complete any setup of any kind
 if [ $DO_SETUP -eq 1 ]
@@ -317,6 +334,65 @@ then
 	wget --quiet -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM" | sed 's/^[\t, ]//g'
 fi
 
+
+# Extract
+if [ $DO_EXTRACT -eq 1 ]
+then
+	# check that there is actually an instance
+	[ -z "$MODNAME" ] && err "Can't extract unspecified package (--extract needs an argument)." 1
+	[ -z "$FOLDER" ] && err "No folder to extract module from (use --folder)." 1
+	[ -z "$EXTRACT_DIR" ] && err "No directory for creation specified (use --directory)" 1
+	# check that there is a module specified
+	# echo $MODNAME $FOLDER $EXTRACT_DIR
+
+	# Make a place for modules...
+	EXDIR=$EXTRACT_DIR/$MODNAME
+	mkdir -pv $EXDIR/
+	mkdir -pv $EXDIR/{api,app,assets,components,db,routes,setup,sql,std,views}/
+
+	# The thing
+	for ff in api app assets setup sql views
+	do
+		[ -d $FOLDER/$ff/$MODNAME/ ] && cp -rv $FOLDER/$ff/$MODNAME/ $EXDIR/$ff/
+	done
+
+	# ???
+	[ -f "$FOLDER/components/${MODNAME}.cfc" ] && cp -v $FOLDER/components/${MODNAME}.cfc $EXDIR/components/
+	[ -f "$FOLDER/routes/${MODNAME}.cfm" ] && cp -v $FOLDER/routes/${MODNAME}.cfm $EXDIR/routes/
+fi
+
+
+# Merge 
+if [ $DO_MERGE -eq 1 ]
+then
+	# check that there is actually an instance
+	[ -z "$MODNAME" ] && err "Can't extract unspecified package (--extract needs an argument)." 1
+	[ -z "$FOLDER" ] && err "No folder to extract module from (use --folder)." 1
+	[ -z "$MERGE_DIR" ] && err "No directory for creation specified (use --directory)" 1
+	# check that there is a module specified
+	# echo $MODNAME $FOLDER $EXTRACT_DIR
+
+	# Make a place for modules...
+	mkdir -pv /tmp/$MODNAME/{api,app,assets,components,db,routes,setup,sql,std,views}/
+
+	# Integrate the files and any dependencies 
+	for ff in api app assets components setup sql views
+	do
+		[ -d $FOLDER/$ff/$MODNAME/ ] && cp -rv $FOLDER/$ff/$MODNAME/ /tmp/$MODNAME/$ff/
+	done
+
+	# ???
+	[ -f "$FOLDER/components/${MODNAME}.cfc" ] && \
+		cp -v $FOLDER/components/${MODNAME}.cfc /tmp/$MODNAME/components/
+	[ -f "$FOLDER/routes/${MODNAME}.cfm" ] && \
+		cp -v $FOLDER/routes/${MODNAME}.cfm /tmp/$MODNAME/routes/
+
+	# Finally, tarball this and copy over the original repository (which should be a git repo) 
+	# I have to choose a repo type (the web is going to be the best choice)
+	# tar cf - /tmp/$MODNAME # | tar xf - -C $REPO/
+
+fi
 exit 0
+
 #cp $SRC/share/apache_htaccess $DIR/.htaccess
 # vim: ff=unix

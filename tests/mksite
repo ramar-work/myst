@@ -5,14 +5,100 @@
 # some variables
 #SITENAME=director.local
 SITENAME=temporary.local
-#DB=director_db
 DB=temp_tdb
 SITEDIR=/srv/http/$SITENAME
 DBPREFIX=ddb_
 HTTPDROOT=/etc/httpd/conf/extra
 REPO=/srv/http/repo.mystframework.local/repo
+PAUSE=0
+
+# An error function
+err() {
+	STATUS=${2:-0}
+	printf "$PROGRAM_NAME: $1\n" > /dev/stderr
+	exit $STATUS
+}
+
+# A usage function
+usage() {
+	STATUS=${2:-0}
+	cat <<EOF
+$0
+-s, --sitename <arg>    Set a sitename 
+-d, --database <arg>    Designate a database 
+    --sitedir <arg>     Set a site directory
+-p, --dbprefix <arg>    Designate a database table prefix
+    --httpdroot <arg>   Use a different document root.
+-r, --repo <arg>        Use a different module repository.
+    --pause             Pause after execution of each step.
+EOF
+	exit $STATUS
+}
+
+# Catch lack of arguments
+# [ $# -eq 0 ] && usage 0
 
 # use regular script rules to set up and tear down things
+while [ $# -gt 0 ]
+do
+	case "$1" in
+
+		-s|--sitename)
+			shift
+			SITENAME="$1"
+		;;
+
+		-d|--database)
+			shift
+			DB="$1"	
+		;;
+
+		--sitedir)
+			shift
+			SITEDIR="$1"
+		;;
+
+		-p|--dbprefix)
+			shift
+			DBPREFIX="$1"
+		;;
+
+		--httpdroot)
+			shift
+			HTTPDROOT="$1"
+		;;
+
+		-r|--repo)
+			shift
+			REPO="$1"
+		;;
+
+	
+		--pause)
+			PAUSE=1
+		;;
+
+	esac
+	shift
+done	
+
+# Reset site directory if it changed.
+SITEDIR=/srv/http/$SITENAME
+
+if [ 1 -eq 1 ]
+then
+	cat <<EOF
+Using the following credentials to make a new instance:
+SITENAME => $SITENAME
+DB => $DB
+SITEDIR => $SITEDIR
+DBPREFIX => $DBPREFIX
+HTTPDROOT => $HTTPDROOT
+REPO => $REPO
+PAUSE => $PAUSE
+EOF
+fi
+
 
 if [ 1 -eq 1 ]
 then
@@ -34,13 +120,13 @@ then
 	echo "myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB"
 	myst --create --name $SITENAME -f $SITEDIR -m $SITENAME --ses --apache --description "Yet another test site." --datasource $DB
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # Why does a name need to specified?
 	echo "myst --folder $SITEDIR --finalize"
 	myst --folder $SITEDIR --finalize
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # Activate this for use with Apache
 	echo "sudo cp $SITEDIR/misc/apache.vhost $HTTPDROOT/vhosts-available/$SITENAME"
@@ -48,7 +134,7 @@ then
 	echo "sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/"
 	sudo ln -s $HTTPDROOT/vhosts-available/$SITENAME $HTTPDROOT/vhosts-enabled/
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # Create a datasource
 	echo "mystdb --create --generate --folder $SITEDIR --mysql --verbose --name $DB --user root"
@@ -57,25 +143,25 @@ then
 
 # echo 'examine the generated datasource'
 #	less $SITEDIR/Application.cfc 
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # Finally, restart the server
 	echo "sudo systemctl restart httpd && sudo systemctl restart lucee"
 	sudo systemctl restart httpd && sudo systemctl restart lucee
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # Add a module (cms)... 
 	echo "mystmod --install $REPO/cms --to $SITEDIR"
 	mystmod --install $REPO/cms --to $SITEDIR
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 # ...and set it up
 	echo "mystmod --setup --address http://$SITENAME --module cms"
 	mystmod --setup --address http://$SITENAME --module cms
 	echo "Done..."
-	read
+	[ $PAUSE -eq 1 ] && read
 
 fi
 
