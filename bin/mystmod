@@ -305,7 +305,7 @@ then
 	# cd /tmp/$MODPATH && ( git --extract-head... | tar xf - -C $FOLDER/ )
 
 	# Web
-	elif [[ ${MODPATH:0:7} == "http://" ]] ||[[ ${MODITEM:0:8} == "https://" ]] 
+	elif [[ ${MODPATH:0:7} == "http://" ]] ||[[ ${MODPATH:0:8} == "https://" ]] 
 	then
 		printf "Pull from HTTP/HTTPS: $MODPATH\n"
 	# ghostbyname ${MODPATH%%...}  # Just pull the hostname and look
@@ -314,8 +314,7 @@ then
 	# Assume that this is from a disk 
 	else
 		printf "Copy from disk: $MODPATH\n"
-exit
-		stat $MODPATH 1>/dev/null 2>/dev/null || err "File $MODITEM not found..."
+		stat $MODPATH 1>/dev/null 2>/dev/null || err "Module '$MODNAME' at $MODPATH not found..."
 		# Distinguish between files and stuff
 		cd $MODPATH
 		tar cf - . | tar xf - --verbose -C $FOLDER/
