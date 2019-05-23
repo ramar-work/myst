@@ -34,7 +34,7 @@ DB_PORT=
 FOLDER=
 
 REMOTE_HOST=
-DO_POSTGRES=0
+DO_PGSQL=0
 DO_MYSQL=0
 DO_MSSQL=0
 DO_DRYRUN=0
@@ -154,7 +154,7 @@ do
 			DO_DRYRUN=1
 		;;
 		-p|--postgres)	
-			DO_POSTGRES=1
+			DO_PGSQL=1
 		;;
 		-m|--mysql)	
 			DO_MYSQL=1
@@ -193,7 +193,7 @@ fi
 
 
 # Set a default port
-[ $DO_POSTGRES -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-0}; DBSUFFIX="pgsql"; }
+[ $DO_PGSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-0}; DBSUFFIX="pgsql"; }
 [ $DO_MYSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-3306}; DBSUFFIX="mysql"; }
 [ $DO_MSSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-1433}; DBSUFFIX="mssql"; }
 DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
@@ -203,7 +203,7 @@ DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
 # Check that actions and types have been received...
 if [ 1 -eq 1 ]
 then
-	[ $DO_MYSQL -eq 0 ] && [ $DO_POSTGRES -eq 0 ] && [ $DO_MSSQL -eq 0 ] && err "No database backend chosen." 1
+	[ $DO_MYSQL -eq 0 ] && [ $DO_PGSQL -eq 0 ] && [ $DO_MSSQL -eq 0 ] && err "No database backend chosen." 1
 	[ $DO_GENERATE -eq 0 ] && [ $DO_CREATE -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
 fi
 
@@ -227,7 +227,7 @@ then
 
 
 	# who to do this as most likely.
-	if [ $DO_POSTGRES -eq 1 ]
+	if [ $DO_PGSQL -eq 1 ]
 	then
 		printf ''
 	fi
@@ -315,7 +315,7 @@ then
 
 	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
 	# who to do this as most likely.
-	if [ $DO_POSTGRES -eq 1 ]
+	if [ $DO_PGSQL -eq 1 ]
 	then
 		printf ''
 	fi
@@ -326,6 +326,12 @@ then
 
 	# Assemble the file differently...
 	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc > $TMPFILE
+
+	# Add the datasource string...
+	if [ $DO_PGSQL -eq 1 ]
+	then
+		printf ''>/dev/null
+	fi
 
 	# Add the datasource string...
 	if [ $DO_MYSQL -eq 1 ]
