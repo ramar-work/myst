@@ -1154,7 +1154,7 @@ component name="Myst" accessors=true {
 
 			//Go through all the components in the components directory
 			var dir = "components";
-			var dirQuery = DirectoryList( "components", false, "query", "" );
+			var dirQuery = DirectoryList( "components", false, "query", "*.cfc" );
 			for ( var q in dirQuery ) {
 				if ( q.name neq "Application.cfc" ) {
 					var vv = Replace( q.name, ".cfc", "" );
@@ -1167,35 +1167,26 @@ component name="Myst" accessors=true {
 			renderPage( status=500, content="Component load failed.", err=e );
 		}
 		
-		//route injection should happen here...
+		//Route injection should happen here.
 		try {
-			//check the routes folder for pretty much anything
-			//var callstat = _include( where = "routes", name = "cms" );
-			//a: json
-			/*
-			var cont = FileRead( "routes/cms.json" );
-			var j = DeserializeJSON( cont );
-writedump(j);
-			*/
-			//easier to load this as something else... or a component
-			//b: cfscript eval'd on the fly
-			//var cont = FileRead( "routes/cms.cf" );
-			//var k = Evaluate(cont);
-			//c: explilcitly scoping the routes with 'data.routes'
-			var callstat = _include( where = "routes", name = "cms" );
-			//d: some kind of component invocation (this is unnecessarily compicated though)
-			//it has the benefit of being able to sit in memory and only be refreshed when
-			//explicitly told to
-			//e: super crude route addition via namespaced variables
-			/*
-			if ( isDefined( "cms" & "_routes" ) ) {
-				for ( var rtName in cms_routes ) {
-				}	
-			}	
-			*/
+			//Add more to logging
+			logReport("Evaluating routes.");
+			var dirQuery = DirectoryList( "routes", false, "query", "*.cfm" );
+			var callstat = 0;
+			for ( var q in dirQuery ) {
+				var n = Replace( q.name, ".cfm", "" );
+				callstat = _include( where = "routes", name = n );
+				if ( !callstat.status ) {
+					renderPage( 
+						status=500
+					, err=callstat.errors
+					, content="Syntax error at routes/#n#"
+					);
+				}
+			}
 		}
 		catch (any e) {
-			renderPage( status=500, content="route injection failed.", err=e );
+			renderPage( status=500, content="Route injection failed.", err=e );
 		}
 
 		//Find the right resource.
@@ -1226,13 +1217,10 @@ writedump(j);
 
 			//Set some short names in case we need to access the page name for routing purposes
 			var rd = findResource( name=cgi.script_name, rl=appdata );
-//writedump(rd);abort;
 			setRname( rd.file /*resourceIndex( name=cgi.script_name, rl=appdata )*/ );
 			variables.data.loaded = variables.data.page = resName = getRname();
 
-			//Send a 404 page and be done if this resource was not specified in
-			//data.cfm.
-			//(resName eq "0") ? renderPage( status=404, content="Resource not found.", err={} ) : 0;
+			//Send a 404 page and be done if this resource was not specified in data.cfm
 			if ( rd.status eq 404 ) {
 				renderPage( status=404, content="Resource not found.", err={} ); 
 			}
@@ -1248,37 +1236,39 @@ writedump(j);
 			//Get the original scope before running anything
 			oScope = ListSort( StructKeyList( variables ), "textNoCase" );
 
+			//Log what's happening	
 			logReport( "Evaluating models..." );
-			//I need to check that the value is  string or an array
-			//The nI need to figure out how to run whatever it is (file, string, etc)
-			ev = checkArrayOrString( rd, "model" );
+	
+			//Model
+			if ( StructKeyExists( rd, "model" ) ) {
+				//Check that the value is a string or an array
+				var ev = checkArrayOrString( rd, "model" );
 
-			//structs allow me to run 'query', 'string', and possibly function
-			//TODO: Add struct handling capability, then calling component methods as models is easy
-			if ( ev.type != "string" && ev.type != "array" ) {
-				renderPage( 
-					status=500
-				, content="Model value at '#rd.file#' was not an array or string."
-				, err={} 
-				);
-			}
+				//TODO: Add the ability to generate models from 'query', 'string', and possibly 
+				//'function'.  This precludes that we must be able to use structs as models.
+				if ( ev.type != "string" && ev.type != "array" ) {
+					renderPage( 
+						status=500
+					, content="Model value at '#rd.file#' was not an array or string."
+					, err={} 
+					);
+				}
 
-			//Set pageArray if it's string or array
-			var pageArray = ( ev.type == 'string' ) ? [ ev.value ] : ev.value;
+				//Set pageArray if it's string or array
+				var pageArray = ( ev.type == 'string' ) ? [ ev.value ] : ev.value;
 
-			//Now load each model, should probably put these in a scope
-			for ( var x in pageArray ) {
-				callStat = _include( where="app", name=x );
-				if ( !callStat.status ) {
-					//plog( ... )
-					renderPage( status=500, content="Error executing model #x#", err=callStat.errors );
+				//Now load each model, should probably put these in a scope
+				for ( var x in pageArray ) {
+					callStat = _include( where="app", name=x );
+					if ( !callStat.status ) {
+						renderPage( status=500, content="Error executing model #x#", err=callStat.errors );
+					}
 				}
 			}
-
-		} 
+		}
 		catch (any e) {
 			//Manually wrap the error template here.
-			renderPage(status=500, err=e, content = "Error executing model." );
+			renderPage(status=500, err=e, content = "Error executing models." );
 		}
 
 		//This is supposed to help me trim scopes...
@@ -1353,7 +1343,6 @@ writedump(j);
 
 
 	/*
-
 	private struct function findResource ( Required String name, Required Struct rl ) {
 
 	why not return with some smart things from here?
@@ -1363,17 +1352,17 @@ writedump(j);
 
 	status = 200, 404, etc
 	path = path as we go through the thing
-
-
 	*/
 	private struct function findResource ( Required String name, Required Struct rl ) {
 		//Define a base here
 		var base = "default";
 		var localName;
+		var tt;
 
 		//Handle situations where no routes are defined.
 		if ( !structKeyExists( rl, "routes" ) || StructIsEmpty( rl.routes ) ) {
-			return base;
+			//return base;
+			return { model="default", view="default", file="", path="", status=200 }
 		}
 
 		//Modify model and view include paths if there is a basedir present.
@@ -1413,7 +1402,12 @@ writedump(j);
 
 		//Handle the default route if rl is not based off of URL
 		if ( !StructKeyExists( rl, "handler" ) && localName == "index.cfm" ) {
-			return rl.routes.default;
+			//return rl.routes.default;
+			var tt = rl.routes.default;
+			tt.file = "index.cfm";
+			tt.path = "/";	
+			tt.status = 200;
+			return tt;
 		}
 
 		/*
