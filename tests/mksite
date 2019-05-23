@@ -3,9 +3,11 @@
 # anything's possible
 
 # some variables
-SITENAME=director.local
+#SITENAME=director.local
+SITENAME=temporary.local
+#DB=director_db
+DB=temp_tdb
 SITEDIR=/srv/http/$SITENAME
-DB=director_db
 DBPREFIX=ddb_
 HTTPDROOT=/etc/httpd/conf/extra
 REPO=/srv/http/repo.mystframework.local/repo

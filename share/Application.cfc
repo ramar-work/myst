@@ -20,12 +20,14 @@ All Application.cfc rules are specified here.
  --->
 component {
 
-	//TODO: Consider getter/setter for elements like this
-	this.sessionManagement = true;
+	function onApplicationStart() {
+		application.defaultdatasource = "__DATASOURCE__";
+		application.sessionManagement = true;
+		return true;
+	}
 
 
 	function onRequestStart (string Page) {
-		//application.data = DeserializeJSON(FileRead(this.jsonManifest, "utf-8"));
 		if (structKeyExists(url, "reload")) {
 			onApplicationStart();
 		}
@@ -43,6 +45,12 @@ component {
 	}
 
 
+	function onMissingTemplate (string Page) {
+		include "index.cfm";
+	}
+
+
+	/*
 	function onError (required any Exception, required string EventName) {
 		e = Exception;
 		//...
@@ -68,9 +76,5 @@ component {
 		//abort;
 		include "failure.cfm";
 	}
-
-
-	function onMissingTemplate (string Page) {
-		include "index.cfm";
-	}
+	*/
 }
