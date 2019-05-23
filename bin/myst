@@ -364,6 +364,13 @@ EOF
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
+	# Also modify the datasource in Application.cfc
+	sed -i -e "{
+		s/__DATASOURCE__/${DATASOURCE}/
+	}" $DIR/Application.cfc
+	[ $VERBOSE -eq 1 ] && echo DONE!
+
+
 	#Create git repo 
 	if [ $NO_GIT -eq 0 ]
 	then 
