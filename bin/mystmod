@@ -31,6 +31,7 @@ LIB_FILE=share/myst/mystlib.sh
 DIR=
 ADDR=
 EXTRACT_DIR=
+CREATE_NEW_MOD=0
 MERGE_DIR=
 DO_INSTALL=0
 DO_EXTRACT=0
@@ -115,9 +116,8 @@ do
 		;;
 
 		# This is for something
-		--directory)
-			shift
-			EXTRACT_DIR="$1"
+		--new)
+			CREATE_NEW_MOD=1
 		;;
 
 		# Administration stuff
@@ -178,13 +178,15 @@ do
 
 		--from)
 			shift
-			MODPATH="$1"
+			FROMPATH="$1"
+#MODPATH="$1"
 		;;
 
 		--to)
 			# Another parameter in data.json
 			shift
-			FOLDER="$1"	
+			TOPATH="$1"
+#FOLDER="$1"	
 		;;
 
 		-m|--domain)
@@ -222,6 +224,20 @@ do
 	esac
 	shift
 done
+
+
+# choose between --install and --extract
+if [ $DO_INSTALL -eq 1 ] 
+then
+	FOLDER=$TOPATH
+	MODPATH=$FROMPATH	
+fi
+
+if [ $DO_EXTRACT -eq 1 ] 
+then
+	FOLDER=$FROMPATH
+	MODPATH=$TOPATH	
+fi
 
 
 # The create routines.
@@ -317,7 +333,10 @@ then
 		stat $MODPATH 1>/dev/null 2>/dev/null || err "Module '$MODNAME' at $MODPATH not found..."
 		# Distinguish between files and stuff
 		cd $MODPATH
-		tar cf - . | tar xf - --verbose -C $FOLDER/
+		[ $VERBOSE -eq 1 ] && TARFLAGS="--verbose" || TARFLAGS=	
+		#[ $VERBOSE -eq 1 ] && echo git archive --format tar HEAD \| tar xf - -C $FOLDER/
+		git archive --format tar HEAD | tar xf - $TARFLAGS --exclude=.gitignore -C $FOLDER/
+		#tar cf - . | tar xf - --verbose -C $FOLDER/
 		cd -
 	fi
 fi
@@ -337,27 +356,36 @@ fi
 # Extract
 if [ $DO_EXTRACT -eq 1 ]
 then
-	# check that there is actually an instance
+	# check that required arguments exist is actually an instance
 	[ -z "$MODNAME" ] && err "Can't extract unspecified package (--extract needs an argument)." 1
-	[ -z "$FOLDER" ] && err "No folder to extract module from (use --folder)." 1
-	[ -z "$EXTRACT_DIR" ] && err "No directory for creation specified (use --directory)" 1
-	# check that there is a module specified
-	# echo $MODNAME $FOLDER $EXTRACT_DIR
+	[ -z "$FOLDER" ] && err "No folder to extract module from (use --folder or --from)." 1
 
-	# Make a place for modules...
-	EXDIR=$EXTRACT_DIR/$MODNAME
-	mkdir -pv $EXDIR/
-	mkdir -pv $EXDIR/{api,app,assets,components,db,routes,setup,sql,std,views}/
+	[ $VERBOSE -eq 1 ] && CPFLAGS="-rv" || CPFLAGS="-r"
+	[ $VERBOSE -eq 1 ] && MKDIRFLAGS="-pv" || MKDIRFLAGS="-p"
 
-	# The thing
-	for ff in api app assets setup sql views
-	do
-		[ -d $FOLDER/$ff/$MODNAME/ ] && cp -rv $FOLDER/$ff/$MODNAME/ $EXDIR/$ff/
+	# Choose whether or not we should create a new module, and check that the module path was specified.
+	if [ $CREATE_NEW_MOD -eq 0 ]
+	then
+		[ -z "$MODPATH" ] && err "No module path to copy module to (use --to)." 1
+		[ -d "$MODPATH" ] || err "Module path directory does not exist." 1
+	else
+		[ -z "$MODPATH" ] && err "No path specified for creation of new module (use --to)." 1
+		[ -d "$MODPATH" ] && err "Module path directory already exists. Refusing to overwrite existing directory." 1
+		mkdir $MKDIRFLAGS $MODPATH/{api,app,assets,components,db,routes,setup,sql,std,views}/ \
+			|| err "Failed to create directory $MODPATH" 1
+	fi
+
+	#...
+	#echo $MODNAME $FOLDER $MODPATH
+
+	# Copy each of the module's directories
+	for ff in api app assets misc setup sql views; do
+		[ -d $FOLDER/$ff/$MODNAME/ ] && cp $CPFLAGS $FOLDER/$ff/$MODNAME/ $MODPATH/$ff/
 	done
 
-	# ???
-	[ -f "$FOLDER/components/${MODNAME}.cfc" ] && cp -v $FOLDER/components/${MODNAME}.cfc $EXDIR/components/
-	[ -f "$FOLDER/routes/${MODNAME}.cfm" ] && cp -v $FOLDER/routes/${MODNAME}.cfm $EXDIR/routes/
+	# Then copy files that SHOULD belong to the module
+	[ -f "$FOLDER/components/${MODNAME}.cfc" ] && cp $CPFLAGS $FOLDER/components/${MODNAME}.cfc $MODPATH/components/
+	[ -f "$FOLDER/routes/${MODNAME}.cfm" ] && cp $CPFLAGS $FOLDER/routes/${MODNAME}.cfm $MODPATH/routes/
 fi
 
 
