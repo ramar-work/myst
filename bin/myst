@@ -35,6 +35,7 @@ PNAME=Myst
 CONF_FILE=/etc/myst.conf
 LIB_FILE=share/myst/mystlib.sh
 SRCREPO=https://github.com/tubularmodular/myst
+STABLE_BRANCH=master
 CHECK="sed|xxd -h|git -h|md5sum -h|diff"
 
 # unconst
@@ -417,10 +418,11 @@ then
 
 	# I don't really need Git to control rollbacks, it's nice, but not necessary
 	[ $VERBOSE -eq 1 ] && echo "Pulling latest copy of $SYMNAME repository."
-	git clone $SRCREPO /tmp/myst
-	cd /tmp/myst/ && git checkout -b myst && git pull github myst && cd -
 	# TODO: Do a simple HTTP GET for the latest version and untar.  These tools
 	# are more or less guaranteed to be present on a system, whereas Git won't.
+	git clone $SRCREPO /tmp/myst
+	#cd /tmp/myst/ && git checkout -b $STABLE_BRANCH && git pull github $STABLE_BRANCH && cd -
+	cd /tmp/myst/ && git checkout $STABLE_BRANCH && cd -
 	mv $MV_FLAGS $DIR/myst.cfc $DIR/myst_.cfc
 	cp $CP_FLAGS /tmp/myst/myst.cfc $DIR/
 	rm -rf /tmp/myst/
