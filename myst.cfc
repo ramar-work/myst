@@ -1868,6 +1868,7 @@ component name="Myst" accessors=true {
 		return v; 
 	}
 
+
 	/**
 	 * setupdatasource( file )
 	 *
@@ -1895,21 +1896,15 @@ component name="Myst" accessors=true {
 		if ( StructKeyExists( arguments, "datasource" ) )
 			ds = arguments.datasource;
 		else {
-
 			//Instantiate Application just to see where things are
 			//TODO: There must be a way to just get the ds name...
 			var a = createObject("component","Application" );
 
 			//check in application scope for ds, then other places
 			if ( StructKeyExists( a, "datasource" ) )
-			{
-sendResponse(status=200,mime="text/html",content="application.datasource = #a.datasource#" );
-			}
+				sendResponse(status=200,mime="text/html",content="application.datasource = #a.datasource#" );
 			else if ( StructKeyExists( a, "defaultdatasource" ) )
-			{
-sendResponse(status=200,mime="text/html",content="application.defaultdatasource = #a.defaultdatasource#" );
-
-			}
+				sendResponse(status=200,mime="text/html",content="application.defaultdatasource = #a.defaultdatasource#" );
 			else if ( StructKeyExists( a, "datasources" ) ) {
 				//unless myst has run, if there is only one ds there...
 				//this should probably use it...
@@ -1924,7 +1919,6 @@ sendResponse(status=200,mime="text/html",content="application.defaultdatasource 
 					ds = tds;
 					break;
 				}
-
 			}
 		}
 
@@ -1944,6 +1938,87 @@ sendResponse(status=200,mime="text/html",content="application.defaultdatasource 
 			sendResponse( status=200, mime="text/html", content="All is well" );	
 		}
 	}
+
+
+	//Make HTTP requests in a saner fashion
+	public struct function httpRequest( required string apiUrl, required string method, struct payload, struct headers ) {
+		//Define some headers
+		var method;
+		var fakeUa = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36";
+		var apiHeaders = {};
+
+		try {
+			//Set some basic headers
+			apiHeaders[ "accept" ] = "*/*";
+			apiHeaders[ "Content-Type" ] = "application/x-www-form-urlencoded";
+			//apiHeaders[ "User-Agent" ] = fakeUa;
+
+			//Check for an access token
+			/*
+			if ( StructKeyExists( session, "access_token" ) ) {
+				headers[ "Authorization" ] = "Bearer #session.access_token#";
+			}
+			*/
+
+			//Negotiate method
+			if ( LCase(arguments.method) eq "post" ) 
+				method="post";
+			else if ( LCase(arguments.method) eq "put" ) 
+				method="put";
+			else if ( LCase(arguments.method) eq "head" )
+				method="head";
+			else {
+				method="get";
+			}
+
+			//Send off a request (remember that it blocks, and also that it ...???)
+			var http = new http( method=UCase(method), charset="utf-8", url=arguments.apiUrl );
+			http.setUserAgent( fakeUa );
+
+			/*
+			//Add the headers
+			if ( StructKeyExists( arguments, "headers" ) ) {
+				for ( var k in arguments.headers ) {
+					http.addParam(type="header",name=k,value=headers[k]);
+				}
+			}
+			*/
+
+			//Add the body fields
+			if ( StructKeyExists( arguments, "payload" ) ) {
+				//check between get and post (or pull them)
+				for ( var k in arguments.payload ) {
+					//TODO: if payload is a one-level deep struct, then don't worry about looping
+					//if it's deeper, then loop through each and continue adding the fields, but you have to 
+					//make sure that one is part of the body and the other is part of the url
+					http.addParam( type="formfield", name=k, value=payload[k] );
+				}
+			}
+
+			//What goes wrong here?!
+			//writedump( http ); abort;
+			var h = http.send( );
+			var p = h.getPrefix();
+			//writedump( p ); writedump( p.fileContent ); abort;
+		}
+		catch (any e) {
+			return {
+				status = false 
+			, message = "FAILURE" 
+			, data = ""
+			, extra = "" 
+			};
+		}
+
+		//When this returns, I want to see the content in my window
+		return {
+			status = true
+		, message = "SUCCESS" 
+		, data = p.fileContent 
+		, extra = p
+		};
+	}
+
 
 	/**
 	 * init()
