@@ -1452,8 +1452,9 @@ component name="Myst" accessors=true {
 			}
 		}
 
+		var diff = 	Len(path) - Len(file);
 		t.file = file;
-		t.path = Left( path, Len(path) - Len(file) );
+		t.path = ( diff ) ? Left( path, diff ) : path; 
 		t.status = 200;
 		return t;	
 	}
