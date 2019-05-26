@@ -59,6 +59,8 @@ accessors = true
 
 		//Finally tell me (in a window) which module this is
 		writeoutput( "Module #c.name# initialized." );
+
+		return this;
 	}
 
 } 

@@ -426,7 +426,9 @@ then
 	mv $MV_FLAGS $DIR/myst.cfc $DIR/myst_.cfc
 	cp $CP_FLAGS /tmp/myst/myst.cfc $DIR/
 	# Right now, the user will need to look before he/she leaps and merge Application.cfc manually
-	cp $CP_FLAGS /tmp/myst/Application.cfc $DIR/Application.cfc.new
+	cp $CP_FLAGS /tmp/myst/share/Application.cfc $DIR/Application.cfc.new
+	# Also explicitly copy the new base.cfc
+	cp $CP_FLAGS /tmp/myst/share/base.cfc $DIR/components/
 	rm -rf /tmp/myst/
 	exit 0
 fi
