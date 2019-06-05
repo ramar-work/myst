@@ -530,7 +530,6 @@ EOF
 	fi
 fi 
 
-
 # Create a virtual host for the server engine in use.
 if [ $DO_GENVHOST -eq 1 ] || [ $CREATE -eq 1 ]
 then
@@ -538,6 +537,8 @@ then
 	# [ ! -z "$DIR" ] || err "No directory specified for vhost..." 1
 	# Make sure that directory exists
 	#[ -d "$DIR" ] || err "Directory does not exist, invalid vhost..." 1;
+	# Check that at least one server is specified
+	[ $APACHIFY -eq 1 ] || err "No server specified. (Try --apachify)" 1
 
 	# Generate an Apache virtual host
 	if [ $APACHIFY -eq 1 ]
