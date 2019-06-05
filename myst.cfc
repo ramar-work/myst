@@ -1155,11 +1155,44 @@ component name="Myst" accessors=true {
 			//Go through all the components in the components directory
 			var dir = "components";
 			var dirQuery = DirectoryList( "components", false, "query", "*.cfc" );
+			/*
 			for ( var q in dirQuery ) {
 				if ( q.name neq "Application.cfc" ) {
 					var vv = Replace( q.name, ".cfc", "" );
 					var m = MystInstance;
 					variables[ vv ] = createObject( "component", "components.#vv#" ).init( m );
+				}
+			}
+			*/
+			//Choose a datasource for each of our modules to use here.
+			var dds = "";
+			if ( StructKeyExists( data, "source" ) )
+				dds = data.source;
+			else if ( StructKeyExists( application, "datasource" ) )
+				dds = application.datasource;
+			else if ( StructKeyExists( application, "defaultdatasource" ) ) {
+				dds = application.defaultdatasource;
+			}
+
+			//Initialize each component with common properties
+			for ( var q in dirQuery ) {
+				if ( q.name neq "Application.cfc" && q.name neq "base.cfc" ) {
+					var vv = Replace( q.name, ".cfc", "" );
+					var m = MystInstance;
+					//variables[ vv ] = createObject( "component", "components.#vv#" ).init( m );
+					var cname = Replace( q.name, ".cfc", "" );
+					//variables[ vv ] = createObject( "component", "components.#vv#" ).init(
+					var cmp 
+					= variables[ vv ]
+					= g[cname] 
+					= createObject( "component", "components.#vv#" ).init(
+							mystObject = m 
+						, realname = cname
+						, namespace = cname
+						, datasource = dds
+						, debuggable = 0
+						, verbose = 1
+					);
 				}
 			}
 		}
