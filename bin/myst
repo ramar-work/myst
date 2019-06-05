@@ -574,17 +574,6 @@ then
 
 EOF
 
-	# Make/add to an .htaccess file
-	if [ $APACHIFY -eq 1 ]
-	then
-			cat <<EOF
-	# Rewrite engine rules
-	RewriteEngine on
-	RewriteRule ^/?([a-z]+)$ \$1.cfm [L]
-
-EOF
-	fi
-
 		# Index
 		cat <<EOF
 	# Auto directory
