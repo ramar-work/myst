@@ -329,6 +329,7 @@ EOF
 	cp $CP_FLAGS $SHAREDIR/setup.cfm $DIR/api/
 	cp $CP_FLAGS $SHAREDIR/{4xx,5xx,mime,html}-view.cfm $DIR/std/
 	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/
+	cp $CP_FLAGS $SHAREDIR/base.cfc $DIR/components/
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
