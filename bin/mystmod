@@ -390,6 +390,11 @@ then
 
 	# Copy each of the module's directories
 	for ff in api app assets misc setup sql views; do
+		# If a dir doesn't exist, warn the user that you need the create option
+		[ ! -d $FOLDER/$ff/ ] && {
+			err "$FOLDER/$ff does not exist.  If you are trying to extract a module into a new directory, use --new in conjunction with the flags used to get here." 
+		}
+
 		[ -d $FOLDER/$ff/$MODNAME/ ] && cp $CPFLAGS $FOLDER/$ff/$MODNAME/ $MODPATH/$ff/
 	done
 
