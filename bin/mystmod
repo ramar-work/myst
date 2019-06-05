@@ -240,6 +240,16 @@ then
 fi
 
 
+# if FOLDER is needed, it ought to be a full path
+if [ ! -z "$FOLDER" ] 
+then
+
+	FOLDER=`realpath $FOLDER`
+	echo $FOLDER
+
+fi
+
+
 # The create routines.
 if [ $DO_CREATE -eq 1 ]
 then
