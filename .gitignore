@@ -5,10 +5,7 @@ src/
 vendor/
 *.class
 !img/*.png
-datasources.todo
-TODO
-myst.todo
-myst_.cfc
+TODO.md
 
 # until these make some headway, let's leave them out of the repo
 bin/mysttest
