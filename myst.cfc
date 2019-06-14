@@ -1191,7 +1191,7 @@ component name="Myst" accessors=true {
 						, namespace = cname
 						, datasource = dds
 						, debuggable = 0
-						, verbose = 1
+						, verbose = 0
 					);
 				}
 			}
