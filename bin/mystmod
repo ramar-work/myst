@@ -377,7 +377,7 @@ then
 	if [ $CREATE_NEW_MOD -eq 0 ]
 	then
 		[ -z "$MODPATH" ] && err "No module path to copy module to (use --to)." 1
-		[ -d "$MODPATH" ] || err "Module path directory does not exist." 1
+		[ -d "$MODPATH" ] || err "Module path directory does not exist (try using --new if you intend to create a new directory)" 1
 	else
 		[ -z "$MODPATH" ] && err "No path specified for creation of new module (use --to)." 1
 		[ -d "$MODPATH" ] && err "Module path directory already exists. Refusing to overwrite existing directory." 1

@@ -758,7 +758,11 @@ component name="Myst" accessors=true {
 		var resultSet;
 
 		//Check for either string or filename
-		if ( !StructKeyExists( arguments, "filename" ) && !StructKeyExists( arguments, "string" ) ) {
+		var cFilename = StructKeyExists( arguments, "filename" );
+		var cString = StructKeyExists( arguments, "string" );
+		var cQuery = StructKeyExists( arguments, "query" );
+
+		if ( !cFilename && !cString ) {
 			return { 
 				status= false, 
 				message= "Either 'filename' or 'string' must be present as an argument to this function."
@@ -766,11 +770,15 @@ component name="Myst" accessors=true {
 		}
 
 		//Make sure data source is a string
-		if ( !IsSimpleValue( arguments.datasource ) )
-			return { status= false, message= "The datasource argument is not a string." };
+		if ( !cQuery ) {
+			if ( !IsSimpleValue( arguments.datasource ) ) {
+				return { status= false, message= "The datasource argument is not a string." };
+			}
 
-		if ( arguments.datasource eq "" )
-			return { status= false, message= "The datasource argument is blank."};
+			if ( arguments.datasource eq "" ) {
+				return { status= false, message= "The datasource argument is blank."};
+			}
+		}
 
 		//Then check and process the SQL statement
 		if ( StructKeyExists( arguments, "string" ) ) {
@@ -823,9 +831,14 @@ component name="Myst" accessors=true {
 		}
 
 		//Set up a new Query
-		q = new Query( datasource="#arguments.datasource#" );	
-		q.setname = "#Name#";
-		//q.setdatasource = arguments.datasource;
+		if ( !cQuery )
+			q = new Query( name="#Name#", datasource="#arguments.datasource#" );	
+		else {
+			q = new Query( name="#Name#", dbtype = "query" );
+			q.setAttributes( _mem_ = arguments.query );
+		}
+
+		//q.setName = "#Name#";
 
 		//If binds exist, do the binding dance 
 		if ( StructKeyExists( arguments, "bindArgs" ) ) {
