@@ -256,7 +256,8 @@ then
 	test ! -z $MODNAME || err "No module name specified." 1
 	test ! -z $DIR || err "No directory specified." 1
 
-	mkdir -pv $DIR/{api,app,assets,components,db,routes,setup,sql,std,views}/$MODNAME/
+	mkdir -pv $DIR/{api,app,components,db,misc,setup,sql,std,views}/$MODNAME/
+	mkdir -pv $DIR/assets/{css,js,img}/$MODNAME/
 
 	# Set this now
 	SRCDIR=$PREFIX
@@ -276,6 +277,10 @@ then
 	done
 
 	mv -v $DIR/components/standard.cfc $DIR/components/$MODNAME.cfc
+
+	sed "{
+		s/__NAMESPACE__/$MODNAME/g;
+	}" $SRCDIR/share/myst/$PROGRAM_NAME/modroute.cfm > $DIR/routes/$MODNAME.cfm
 
 	if [ $NO_GIT -eq 1 ]
 	then	

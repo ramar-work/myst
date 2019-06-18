@@ -20,7 +20,9 @@
  *
  * -------------------------------------------------------------------------- */
 component 
-	name="__MODNAME__"
-	accessors=true {
+name="__MODNAME__"
+extends="Base"
+accessors=true 
+{
 
 }
