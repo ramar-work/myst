@@ -258,6 +258,7 @@ then
 
 	mkdir -pv $DIR/{api,app,components,db,misc,setup,sql,std,views}/$MODNAME/
 	mkdir -pv $DIR/assets/{css,js,img}/$MODNAME/
+	mkdir -v $DIR/routes/
 
 	# Set this now
 	SRCDIR=$PREFIX
@@ -276,6 +277,7 @@ then
 		}" $SRCDIR/share/myst/$PROGRAM_NAME/$BASENAME > $DIR/$ff
 	done
 
+	mv -v $DIR/{Makefile,README.md} $DIR/misc/$MODNAME/
 	mv -v $DIR/components/standard.cfc $DIR/components/$MODNAME.cfc
 
 	sed "{
