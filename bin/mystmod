@@ -286,9 +286,10 @@ then
 		s/__NAMESPACE__/$MODNAME/g;
 	}" $SRCDIR/share/myst/$PROGRAM_NAME/modroute.cfm > $DIR/routes/$MODNAME.cfm
 
-	if [ $NO_GIT -eq 1 ]
+	if [ $NO_GIT -eq 0 ]
 	then	
 		cd $DIR
+		touch .gitignore
 		git init
 		git add .
 		git commit -m "Initial commit of module '$MODNAME'"
