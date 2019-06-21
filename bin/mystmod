@@ -63,7 +63,7 @@ usage() {
 	cat <<USAGES
 $0:
 Creation options:
--c, --create            Create a new module. 
+-c, --create <arg>      Create a new module named <arg>.
 -f, --folder <arg>      Specify which folder to use when creating a new module.
 -n, --name <arg>        Specify a name to use for the new module. 
 -t, --test-on <arg>     Compresses the current Git HEAD and applies to a Myst instance. 
@@ -128,6 +128,8 @@ do
 		# Administration stuff
 		-c|--create)
 			DO_CREATE=1
+			shift
+			MODNAME="$1"	
 		;;
 
 		--apachify)
