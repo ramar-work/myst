@@ -26,6 +26,7 @@
 # - Add options for SSL (since the cert may be involved at Tomcat's level) 
 # - Configure with IIS
 # - Configure with nginx 
+#
 # -------------------------------------------- #
 
 # const 
@@ -314,7 +315,7 @@ EOF
 	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
 	mkdir $MKDIR_FLAGS $DIR/{api,app,assets,components,db,files,log,misc,routes,setup,sql,std,views}/
-	mkdir $MKDIR_FLAGS $DIR/assets/{css,js}/
+	mkdir $MKDIR_FLAGS $DIR/assets/{css,img,js}/
 	mkdir $MKDIR_FLAGS $DIR/db/static/
 	mkdir $MKDIR_FLAGS $DIR/std/custom/
 	mkdir $MKDIR_FLAGS $DIR/std/components/
