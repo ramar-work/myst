@@ -388,7 +388,7 @@ accessors=true
 	 * ...
 	 *
 	 */
-	private Struct function getType ( Required sCheck ) {
+	public Struct function getType ( Required sCheck ) {
 		//Get the type name
 		var t = getMetadata( sCheck );
 		var typename;
@@ -1169,23 +1169,6 @@ accessors=true
 			//TODO: All aliasing needs to be handled here.	
 			var ses_path = (check_deep_key( appdata, "settings", "ses" )) 
 				? cgi.path_info : cgi.script_name;
-
-			//Invoke API endpoints directly, bypass MVC loading routines with Myst
-			if ( Left( Replace( ses_path, appdata.base, "" ), 4 ) == "api/" ) {
-				//TODO: Abstract 'models' and 'views' loading
-				try {
-					include ses_path;
-				}
-				catch (any e ) {
-					//could be 404, could be 500, could even be 40x (auth errors)
-					if ( e.type == 'missinginclude' )
-						sendAsJson( status=0, httpStatus=404, content="Resource #ses_path# not found." );
-					else {
-						sendAsJson( status=0, httpStatus=500, content="Exception occurred.", exception=e );
-					}
-				}
-				abort;
-			}
 
 			//Set some short names in case we need to access the page name for routing purposes
 			var rd = findResource( name=cgi.script_name, rl=appdata );
