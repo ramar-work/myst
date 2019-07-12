@@ -233,6 +233,25 @@ then
 fi
 
 
+# Try to build Apache? (I feel like this is going to be super error prone)
+if [ 1 -eq 1 ]
+then
+	LP=`dirname $LUCEE_PREFIX`
+	cd vendor/httpd-2.4.37/
+	# TODO: Statically compile in SSL support and a bunch of other stuff...
+	./configure --prefix=$LP/httpd --with-included-apr --disable-autoindex || err "Configure failed." 1
+	# TODO: Use --with-suexec-caller <user> to keep things more secure...
+	make || err "'make' failed." 1
+	make install || err "'make install' failed." 1
+	# TODO: Isn't there a way to suppress build of documentation?
+	test -d $LP/httpd/man && rm -rf $LP/httpd/man/ 
+	test -d $LP/httpd/manual && rm -rf $LP/httpd/manual/ 
+	#test -d $LP/httpd/icons && rm -rf $LP/httpd/icons/ 
+	cd -
+exit
+fi
+
+
 # pull down the distribution if asked for
 if [ $DO_DOWNLOAD -eq 0 ]
 then
@@ -331,6 +350,7 @@ then
 
 	# copy this precompiled shared object into Apache's modules directory
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Installing mod_cfml.so to filesystem...\n"
+	# TODO: You need versions of mod_cfml for Windows as well
 	cp $CPFLAGS $FILE_BASE/mod_cfml.so $HTTPD_LIBDIR/
 
 	# deploy a host somewhere that Apache can see it
