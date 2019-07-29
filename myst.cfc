@@ -1217,7 +1217,8 @@ accessors=true
 					}
 				}
 				else {
-					for ( var ind=1; ind<ArrayLen(ev.value); ind++ ) {
+
+					for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
 						var ee = ev.value[ ind ]; 
 						var ey = getType( ee );	
 						if ( ey.type == "string" || ey.type == "closure" )
@@ -1242,7 +1243,7 @@ accessors=true
 						}
 					}
 				}
-//writedump(pgArray); abort;
+
 				//Now load each model, should probably put these in a scope
 				for ( var page in pgArray ) {
 					var callStat;

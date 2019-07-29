@@ -122,6 +122,10 @@ do
 		-a|--automated-install) # do an automated install
 			DO_AUTOMATED=1
 		;;
+		-l|--lucee-local) # use the lucee version here instead of another
+			shift
+			LUCEE_PKG="$1"
+		;;
 		-s|--skip-download) # skip download
 			DO_DOWNLOAD=0
 		;;
