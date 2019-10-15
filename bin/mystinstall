@@ -342,16 +342,16 @@ then
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Modifying main Apache config file...\n"
 	sed -i -e '$ a # Include CFML settings in one file' $HTTPD_CONFDIR/httpd.conf
 	sed -i -e '$ a Include conf/extra/httpd-cfml.conf' $HTTPD_CONFDIR/httpd.conf
-	sed -i -e '{
-		s/User http/User ramar/;
-		s/Group http/Group ramar/;
+	sed -i -e "{
+		s/User http/User $LUCEE_USER/;
+		s/Group http/Group $LUCEE_USER/;
 		/#LoadModule proxy_module modules\/mod_proxy.so/ s/^#//;
 		/#LoadModule proxy_connect_module modules\/mod_proxy_connect.so/ s/^#//;
 		/#LoadModule proxy_http_module modules\/mod_proxy_http.so/ s/^#//;
 		/#LoadModule proxy_ajp_module modules\/mod_proxy_ajp.so/ s/^#//;
 		/#LoadModule rewrite_module modules\/mod_rewrite.so/ s/^#//;
 		/#Include conf\/extra\/httpd-vhosts.conf/ s/^#//;
-	}' $HTTPD_CONFDIR/httpd.conf
+	}" $HTTPD_CONFDIR/httpd.conf
 
 	# modify httpd-cfml.conf
 	[ $DO_VERBOSE -eq 1 ] && printf "\n* Updating shared keys for mod CFML...\n"
