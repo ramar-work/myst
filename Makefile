@@ -36,12 +36,14 @@ uninstall:
 pkgMakefile:
 	@sed '/^# /d' Makefile | cpp - | sed '/^# /d'
 
-
-# pkg - Create new packages for distribution
+# pkg - Create a package out of the most recent version
 pkg:
+	git archive --format=tar --prefix=myst/ master | gzip > /tmp/$(NAME).tar.gz
+
+# pkgtag - Create new packages for distribution
+pkgtag:
 	git archive --format=tar --prefix=myst/ `git tag | tail -n 1` | \
 		gzip > /tmp/$(NAME)-`git tag | tail -n 1`.tar.gz
-
 
 # testprojects - Generate projects that stress test Apache proxy and Lucee standalone installs
 test: VH_TEST=testvh
