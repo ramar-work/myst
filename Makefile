@@ -34,14 +34,21 @@ TOMCAT_SHUTDOWN_PORT=8005
 TOMCAT_PORT=8888
 TOMCAT_AJP_PORT=8009
 TOMCAT_SECRET_KEY=$(shell head -c 32 /dev/urandom | xxd -ps -c 64)
+TOMCAT_MINHEAP=64
+TOMCAT_MAXHEAP=2048
 
 #All the Apache stuff is here
-HTTPD_PREFIX=$(PREFIX)/httpd
 FILE_BASE=./share/mystinstall
+HTTPD_PREFIX=$(PREFIX)/httpd
 HTTPD_LIBDIR=$(HTTPD_PREFIX)/modules
 HTTPD_SRVDIR=$(HTTPD_PREFIX)/htdocs
 HTTPD_CONFDIR=$(HTTPD_PREFIX)/conf
 CONF_FILE=/etc/myst.conf
+
+#Service related items here
+HTTP_PORT=80
+HTTPS_PORT=443
+SERVER_ROOT=$(HTTPD_PREFIX)
 
 # top: Check for depdencies, build local version of httpd & grab the newest Lucee 
 top:
@@ -73,6 +80,7 @@ dependency-check:
 # 1. Recompiling Apache may be fine after installing APR & APR util
 # 2. Does --enable-static-support solve the problem?
 # 3. Build in this directory and simply move ./tmp/myst to $(PREFIX)/myst
+#
 # build: Build localized Apache and supporting libraries
 build:
 	test -d $(LP) || mkdir -p $(LP)/
@@ -134,6 +142,8 @@ install:
 	make lucee-install
 	@echo Installing Myst configuration...
 	make config-install
+	@echo Installing test project...
+	make http-test-install
 	@echo Updating Myst permissions...
 	chown -R $(USER):$(GROUP) $(HTTPD_SRVDIR)/
 
@@ -144,19 +154,62 @@ config-install:
 	cp -rf ./share/$(WILDCARD) $(PREFIX)/share/$(NAME)/
 	cp -f ./$(NAME).cfc $(PREFIX)/share/$(NAME)/
 	cp -f ./etc/$(NAME).conf $(CONFIG)/
-	cp $(FILE_BASE)/mod_cfml.so $(HTTPD_LIBDIR)/
+
+
+# http-test-install: install an HTTP test project
+http-test-install:
+	sed -e "{ \
+		s/@@SITEDOMAIN@@/taggart.local/; \
+		s/@@SITENAME@@/taggart.local/; \
+		s/@@ALIASDOMAIN@@/taggarthttp.local/; \
+		s;@@WWWROOT@@;$(HTTPD_SRVDIR);; \
+	}" $(FILE_BASE)/../default.vhost > $(HTTPD_CONFDIR)/extra/vhosts/taggart.local.conf
 	cp -r $(FILE_BASE)/taggart.local $(HTTPD_SRVDIR)/
-	sed -i -e "{ \
-		s/@@SECRETKEY@@/$(TOMCAT_SECRET_KEY)/ \
-	}" $(FILE_BASE)/httpd-cfml.conf > $(HTTPD_CONFDIR)/extra/httpd-cfml.conf
 
 
+# https-test-install: install an HTTPS test project
+https-test-install:
+	cp -r $(FILE_BASE)/taggart-https.local $(HTTPD_SRVDIR)/
+
+# Need to add a lot to the Apache config file...
+#
+# TODO:
+# x mod_cfml support for one
+# x ssl support for two (although, if embedding Apache, it should be compiled in)
+# x virtual hosts: Include conf/extra/vhosts-enabled/* 
+#
+# TODO:
+# Modify the SSL support and CFML support here
+#
+# TODO: SSL is not working yet...
+# /#Include conf\/extra\/httpd-ssl.conf/ s/^#//;
+#
 # httpd-install: Install the localized HTTPD to a real system folder, delete its documentation as well.
 httpd-install:
 	test -d $(PREFIX)/httpd || mkdir -p  $(PREFIX)/httpd
 	cd vendor/$(HTTPDV)/ && make install
 	test -d $(PREFIX)/httpd/man && rm -rf $(PREFIX)/httpd/man/ 
 	test -d $(PREFIX)/httpd/manual && rm -rf $(PREFIX)/httpd/manual/ 
+	test -d $(PREFIX)/virt-hosts-available || mkdir -p $(PREFIX)/virt-hosts-available/
+	test -d $(PREFIX)/virt-hosts-enabled || mkdir -p $(PREFIX)/virt-hosts-enabled/
+	ln -s $(PREFIX)/virt-hosts-enabled $(PREFIX)/httpd/conf/extra/vhosts
+	cp $(FILE_BASE)/mod_cfml.so $(HTTPD_LIBDIR)/
+	sed -e "{ \
+		s/@@PROXYPORT@@/$(TOMCAT_PORT)/; \
+		s/@@SECRETKEY@@/${TOMCAT_SECRET_KEY}/ \
+	}" $(FILE_BASE)/httpd-cfml.conf > $(HTTPD_CONFDIR)/extra/httpd-cfml.conf
+	sed -i -e '$$ a # Include CFML settings in one file' $(HTTPD_CONFDIR)/httpd.conf
+	sed -i -e '$$ a Include conf/extra/httpd-cfml.conf' $(HTTPD_CONFDIR)/httpd.conf
+	sed -i -e "{ \
+		s/User http/User $(USER)/; \
+		s/Group http/Group $(GROUP)/; \
+		s;#Include conf/extra/httpd-vhosts.conf;Include conf/extra/vhosts/$(WILDCARD);; \
+		/#LoadModule proxy_module modules\/mod_proxy.so/ s/^#//; \
+		/#LoadModule proxy_connect_module modules\/mod_proxy_connect.so/ s/^#//; \
+		/#LoadModule proxy_http_module modules\/mod_proxy_http.so/ s/^#//; \
+		/#LoadModule proxy_ajp_module modules\/mod_proxy_ajp.so/ s/^#//; \
+		/#LoadModule rewrite_module modules\/mod_rewrite.so/ s/^#//; \
+	}" $(HTTPD_CONFDIR)/httpd.conf
 
 
 # lucee-install: Install Lucee to $(PREFIX)
@@ -176,13 +229,17 @@ lucee-install:
 		--systemuser "$(USER)" \
 		--bittype 64
 	mkdir -p $(PREFIX)/jdk/
-	ln -s $(PREFIX)/jre64-lin/jre $(PREFIX)/jdk/
+	test -h $(PREFIX)/jdk/jre || ln -s $(PREFIX)/jre64-lin/jre $(PREFIX)/jdk/
 	sed -i -e "{ \
 		s/@@tomcatshutdownport@@/$(TOMCAT_SHUTDOWN_PORT)/; \
 		s/@@tomcatport@@/$(TOMCAT_PORT)/; \
 		s/@@tomcatajpport@@/$(TOMCAT_AJP_PORT)/; \
-		s/@@secretkey@@/$(TOMCAT_SECRET_KEY)/; \
+		s/@@secretkey@@/${TOMCAT_SECRET_KEY}/; \
 	}" $(PREFIX)/tomcat/conf/server.xml
+	sed -i -e "{ \
+		s/@@minheap@@/$(TOMCAT_MINHEAP)/; \
+		s/@@maxheap@@/$(TOMCAT_MAXHEAP)/; \
+	}" $(PREFIX)/tomcat/bin/setenv.sh
 
 
 # systemd-init: Prepare systemd files
@@ -203,16 +260,18 @@ systemd-init:
 
 # uninstall - Uninstall the myst package on a new system
 uninstall:
-	-rm -f $(PREFIX)/bin/$(NAME)
-	-rm -f $(CONFIG)/$(NAME).conf
-	-rm -rf $(PREFIX)/share/$(NAME)/
-	-systemctl disable lucee
-	-rm -f /usr/lib/systemd/system/lucee.service
+	-systemctl disable myst 
+	-rm -f /usr/lib/systemd/system/myst.service
+	-systemctl disable lupache 
+	-rm -f /usr/lib/systemd/system/lupache.service
+	-rm -rf /opt/myst2/
+
 
 # list - List all the targets and what they do
 list:
 	@printf 'Available options are:\n'
 	@sed -n '/^#/ { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
+
 
 #if 0 
 # usermake - Create a modified Makefile for regular users
@@ -228,6 +287,17 @@ pkg:
 pkgmaster:
 	git archive --format=tar --prefix=myst/ apache | \
 		gzip > /tmp/$(NAME).tar.gz
+
+
+
+
+
+
+
+
+
+
+
 
 # testprojects - Generate projects that stress test Apache proxy and Lucee standalone installs
 test: VH_TEST=testvh

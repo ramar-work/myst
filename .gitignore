@@ -3,6 +3,7 @@ assets/
 examples/
 src/
 vendor/
+tmp/
 *.class
 !img/*.png
 TODO.md

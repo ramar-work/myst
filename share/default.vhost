@@ -1,0 +1,19 @@
+# Virtual host for site titled '@@SITENAME@@', generated @@DATE@@
+<VirtualHost *:80>
+	# Admin email, Server Name (domain name) and any aliases
+	ServerName  @@SITEDOMAIN@@
+	ServerAlias www.@@ALIASDOMAIN@@
+
+	# Index file and Document Root (where the public files are located)
+	DocumentRoot @@WWWROOT@@/@@SITENAME@@
+
+	# Custom log file locations
+	LogLevel warn
+	ErrorLog @@WWWROOT@@/@@SITENAME@@/log/srvError.log
+	CustomLog @@WWWROOT@@/@@SITENAME@@/log/srvAccess.log combined
+	#ErrorLog  /srv/http/testvh/log/srvError.log
+	#CustomLog /srv/http/testvh/log/srvAccess.log combined
+
+	# Index
+	DirectoryIndex index.cfm index.html
+</VirtualHost>
