@@ -1,0 +1,15 @@
+# lucee service (should start after lupache)
+[Unit]
+Description="Lucee CFML server"
+After=network.target
+
+[Service]
+ExecStart=@@LUCEE_DIR@@/lucee_ctl start
+ExecStop=@@LUCEE_DIR@@/lucee_ctl stop
+ExecReload=@@LUCEE_DIR@@/lucee_ctl restart 
+Type=forking
+#User=@@USER@@
+#Group=@@GROUP@@
+
+[Install]
+WantedBy=multi-user.target
