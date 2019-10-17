@@ -2,6 +2,7 @@ archive/
 assets/
 examples/
 src/
+share/frogs/
 vendor/
 tmp/
 *.class
