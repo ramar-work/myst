@@ -1,0 +1,3 @@
+# .htaccess for site titled '@@domain@@', generated @@date@@ 
+RewriteEngine on
+RewriteRule ^/?([a-z]+)$ \$1.cfm [L]

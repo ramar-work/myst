@@ -1,0 +1,13 @@
+# Filter out everything
+*
+
+# Explicitly add the framework's directories
+!api/*
+!app/*
+!assets/{css,js}/*
+!components/*
+!routes/*
+!setup/*
+!sql/*
+!std/*
+!views/*

@@ -33,8 +33,8 @@ LUCEE_PREFIX=/tmp/myst
 TOMCAT_SHUTDOWN_PORT=8005
 TOMCAT_PORT=8888
 TOMCAT_AJP_PORT=8009
-TOMCAT_MINHEAP=64
-TOMCAT_MAXHEAP=2048
+TOMCAT_MIN_HEAP=64
+TOMCAT_MAX_HEAP=2048
 TOMCAT_CONFIG=$(LP)/tomcat.key
 
 #All the Apache stuff is here
@@ -58,9 +58,23 @@ top:
 	test -f $(LP)/lucee.run || make retrieve-lucee 
 
 
+# dump: Dump the current configuration
+dump:
+	@echo USER $(USER)
+	@echo GROUP $(GROUP)
+	@echo PREFIX $(PREFIX)
+	@echo SYSTEMD_LIBDIR $(SYSTEMD_LIBDIR)
+	@echo HTTP_PORT $(HTTP_PORT)
+	@echo HTTPS_PORT $(HTTPS_PORT)
+	@echo TOMCAT_PORT $(TOMCAT_PORT)
+	@echo TOMCAT_MIN_HEAP $(TOMCAT_MIN_HEAP)
+	@echo TOMCAT_MAX_HEAP $(TOMCAT_MAX_HEAP)
+
+
 # clean: Clean up everything
 clean:
 	-rm -rf $(LP) vendor/$(HTTPDV)/ vendor/$(APRV)/ vendor/$(APRUTILV)/
+	-rmdir `dirname $(LP)`
 
 
 # dependency-check: Check for dependencies
@@ -143,6 +157,8 @@ install:
 	@echo Installing Lucee...
 	make lucee-install
 	@rm -f $(TOMCAT_CONFIG)
+	@echo Installing Myst scripts...
+	make bin-install
 	@echo Installing Myst configuration...
 	make config-install
 	@echo Installing test project...
@@ -153,10 +169,20 @@ install:
 
 # config-install: install all the configuration and files
 config-install:
-	cp -rf ./bin/$(WILDCARD) $(PREFIX)/bin/
 	cp -rf ./share/$(WILDCARD) $(PREFIX)/share/$(NAME)/
 	cp -f ./$(NAME).cfc $(PREFIX)/share/$(NAME)/
-	cp -f ./etc/$(NAME).conf $(CONFIG)/
+	sed -e "{ \
+		s;@@PREFIX@@;$(PREFIX);; \
+		s/@@USER@@/$(USER)/; \
+		s/@@GROUP@@/$(GROUP)/; \
+		s/@@HTTP_PORT@@/$(HTTP_PORT)/; \
+		s/@@HTTPS_PORT@@/$(HTTPS_PORT)/; \
+	}" ./etc/$(NAME).conf > $(CONF_FILE)
+
+
+# bin-install: Move all the scripts to the right place
+bin-install:
+	cp -rf ./bin/$(WILDCARD) $(PREFIX)/bin/
 
 
 # http-test-install: install an HTTP test project
@@ -218,7 +244,8 @@ httpd-install:
 
 # lucee-install: Install Lucee to $(PREFIX)
 #
-# Some other useful options:
+# TODO: 
+# Try a few of these. May prevent having to use two daemons
 # --apachecontrolloc <apachecontrolloc>       Apache Control Script Location
 # --apachemodulesloc <apachemodulesloc>       Apache Modules Directory
 # --apacheconfigloc <apacheconfigloc>         Apache Configuration File
@@ -242,8 +269,8 @@ lucee-install:
 		s/@@secretkey@@/$$TOMCAT_KEY/; \
 	}" $(PREFIX)/tomcat/conf/server.xml
 	sed -i -e "{ \
-		s/@@minheap@@/$(TOMCAT_MINHEAP)/; \
-		s/@@maxheap@@/$(TOMCAT_MAXHEAP)/; \
+		s/@@minheap@@/$(TOMCAT_MIN_HEAP)/; \
+		s/@@maxheap@@/$(TOMCAT_MAX_HEAP)/; \
 	}" $(PREFIX)/tomcat/bin/setenv.sh
 
 
@@ -261,6 +288,21 @@ systemd-init:
 		s/@@USER@@/$(USER)/; \
 		s/@@GROUP@@/$(GROUP)/; \
 	}" $(FILE_BASE)/myst.service > $(SYSTEMD_LIBDIR)/myst.service
+	systemctl daemon-reload
+
+
+# systemd-start:
+systemd-start:
+	echo Starting systemd services
+	systemctl start lupache
+	systemctl start myst 
+
+
+# systemd-start:
+systemd-stop:
+	echo Starting systemd services
+	systemctl stop lupache
+	systemctl stop myst 
 
 
 # uninstall - Uninstall the myst package on a new system
@@ -292,43 +334,6 @@ pkg:
 pkgmaster:
 	git archive --format=tar --prefix=myst/ apache | \
 		gzip > /tmp/$(NAME).tar.gz
-
-
-
-
-
-
-
-
-
-
-
-
-# testprojects - Generate projects that stress test Apache proxy and Lucee standalone installs
-test: VH_TEST=testvh
-test: SA_TEST=testsa
-test: LUCEE_DIR=/opt/lucee/tomcat/webapps
-test:
-	$(NAME) --create --basedir $(SA_TEST) --folder $(LUCEE_DIR)/$(SA_TEST) \
-		--name $(SA_TEST)
-	$(NAME) --create --folder /srv/http/$(VH_TEST) --name $(VH_TEST)
-
-
-# testre - Delete project folders and remake them for easy 
-reset: VH_TEST=testvh
-reset: SA_TEST=testsa
-reset: LUCEE_DIR=/opt/lucee/tomcat/webapps
-reset:
-	rm -rfv $(LUCEE_DIR)/$(SA_TEST) /srv/http/$(VH_TEST)
-
-
-# testinit - Make sure the dev system is setup to run some tests
-testinit:
-	systemctl restart httpd
-	systemctl restart lucee
-	test -z "`grep 'testvh.local' /etc/hosts`" && \
-		printf "127.0.0.1\ttestvh.local\twww.testvh.local\n" >> /etc/hosts || \
-		printf '' >/dev/null
 
 
 # otn - Switches sites that were previously running coldmvc.cfc as their

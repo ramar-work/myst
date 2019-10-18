@@ -18,14 +18,12 @@
 # 	
 # TODO
 # ----
+# - Output a production ready package?
 #	- Be able to build from JSON, XML, or something
 # - Handle setup tasks and tooling ( like database connections and maintenance ) 
-# - Convert cli scripts to Java or C++
+# - Convert cli scripts to Java, C or C++
 # - Make sure user matches server user
-# - Add options for Tomcat
 # - Add options for SSL (since the cert may be involved at Tomcat's level) 
-# - Configure with IIS
-# - Configure with nginx 
 #
 # -------------------------------------------- #
 
@@ -45,18 +43,19 @@ THIS_SITE=
 SRC=.
 DO_SES=0
 DO_GENVHOST=0
-CREATE=0
+DO_ACTIVATE=0
+DO_CREATE=0
 UPDATE=0
 NO_GIT=0
-ACTIVATE=0
 VERBOSE=0
 ERR_NODIR=1
 ERR_NONAME=2
-APACHIFY=0
 ENGINE=
 VHOST_FILE=
 BACKUP_FILE=
 DO_FINALIZE=0
+DO_ENABLE=0
+DO_DISABLE=0
 
 
 # An error function
@@ -68,14 +67,9 @@ err() {
 
 
 # A usage function
+#-e, --ses                Enable search engine safe URLs
 usage() {
 	STATUS=${2:-0}
-
-#-t, --test              Test out data.json with parameters.
-#  --maintenance       Put a site in maintenance mode.
-#-e, --engine <arg>       Specify which CFML engine you're running [ Lucee, Coldfusion ]
-#  --nginx              Create an Apache-style virtual host and an .htaccess file.
-#  --iis                Create an Apache-style virtual host and an .htaccess file.
 	cat <<USAGES
 $PROGRAM_NAME:
 Instance options:
@@ -83,7 +77,8 @@ Instance options:
 -u, --update <arg>       Update the instance at <arg>. 
     --activate <dir>     Activate a site (turn off defaults that ship with new projects)
     --no-git             Don't create a Git repo.
--e, --ses                Enable search engine safe URLs
+-e, --enable             Enable this host 
+-x, --disable            Disable this host
 -b, --basedir <arg>      Specify a base directory.
 -f, --folder <arg>       Specify which folder to use when creating a new instance.
 -n, --name <arg>         Specify a name to use for a new instance. 
@@ -93,7 +88,6 @@ Instance options:
     --finalize <arg>     Finalize a Myst instance.
 
 Modifiers and server-specific options:
-    --apache             Create a root-level configuration file compatible with Apache.
 -i, --virtual-host <arg> Create a \$SERVER-style virtual host and an .htaccess file.
 
 General options:
@@ -105,13 +99,68 @@ USAGES
 }
 
 
+# Check for dependencies
+check() {
+	if [ -z "$1" ]
+	then 
+		printf "check(): No list specified.  Fix this.\n"
+		exit 1
+	fi	
+
+	IFS='|'
+	for n in $1
+	do 
+		sh -c ${n} 2>/dev/null
+		if [ $? -eq 127 ]
+		then 
+			printf "$PROGRAM_NAME: Dependency '$n' not found.  " > /dev/stderr
+			printf "Please install package '$n' using a package manager.\n" > /dev/stderr
+		fi
+	done
+	IFS=" "
+}
+
+
+# Determine whether an argument is a flag or not
+detFlag() {
+	if [ -z "$1" ]
+	then
+		echo -1 
+	else
+		# arg is a single, lonely dash
+		if [ ${#1} -eq 1 ] && [ $1 == '-' ] 
+		then
+			echo 0
+
+		# arg is a short arg flag 
+		elif [ ${1:0:1} == '-' ] && [[ ${1:1:1} =~ [a-z] ]]
+		then
+			echo -1 
+
+		# arg is a long arg flag 
+		elif [ ${1:0:1} == '-' ] && [ ${1:1:1} == '-' ]
+		then
+			echo -1 
+
+		# arg is an arg
+		else
+			echo 1
+
+		fi
+	fi
+}
+
+
 # Check for the config file, and lib files, stopping if either isn't present. 
-[ ! -f $CONF_FILE ] && \
-	err "$PNAME is not installed yet.  Please run 'make install' from $PNAME's source directory.\n"  1
-source $CONF_FILE
-[ ! -d $PREFIX ] && err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
-[ ! -f $PREFIX/$LIB_FILE ] && err "$PNAME didn't install correctly (couldn't find $LIB_FILE)\n" 1
-source $PREFIX/$LIB_FILE
+[ -f $CONF_FILE ] && source $CONF_FILE || {
+	printf "$PNAME is not installed yet.  "
+	err "Please run 'make install' from $PNAME's source directory.\n"  1
+}
+#source $CONF_FILE
+
+[ ! -d $PREFIX ] && {
+	err "$PNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
+}
 
 
 # Catch blank arguments
@@ -124,7 +173,15 @@ do
 	case "$1" in
 		# Administration stuff
 		-c|--create)
-			CREATE=1
+			DO_CREATE=1
+		;;
+
+		-e|--enable)
+			DO_ENABLE=1
+		;;
+
+		-x|--disable)
+			DO_DISABLE=1
 		;;
 
 		# Administration stuff
@@ -136,26 +193,19 @@ do
 			DIR="$1"
 		;;
 
-
 		# Turn off the 'default' that ships
 		--activate)
-			ACTIVATE=1
-			CODE=`detFlag "$2"`;
-			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
-			shift
-			THIS_SITE="$1"
-		;;
-
-		# Generate server confiuguration files for an Apache server 
-		--apache|--apachify)
-			APACHIFY=1
-			ENGINE='apache'
+			DO_ACTIVATE=1
+#			CODE=`detFlag "$2"`;
+#			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+#			shift
+#			THIS_SITE="$1"
 		;;
 
 		# Enable the capacity to serve SES URLs via server configuration
-		-e|--ses|--search-engine-safe)
-			DO_SES=1
-		;;
+	#	-e|--ses|--search-engine-safe)
+	#		DO_SES=1
+	#	;;
 
 		# Turn off the defaults
 		--finalize)
@@ -180,9 +230,9 @@ do
 		;;
 
 		# Try parsing data.cfm and check for errors before starting
-		-t|--parse-root)
-			DO_TESTJSON=1
-		;;
+#		-t|--parse-root)
+#			DO_TESTJSON=1
+#		;;
 
 		# Parameters 
 		-f|--at|--folder)
@@ -253,6 +303,12 @@ do
 done
 
 
+
+#$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG 2>/dev/null
+#$HTTPD_PREFIX/conf
+#ls $PREFIX/virt-hosts-available
+#exit
+
 # Handle verbosity
 [ $VERBOSE -eq 1 ] && MKDIR_FLAGS="-pv" || MKDIR_FLAGS="-p"
 [ $VERBOSE -eq 1 ] && CP_FLAGS="-v" || CP_FLAGS=""
@@ -260,16 +316,34 @@ done
 
 
 # CREATE NEW CMVC INSTANCES
-if [ $CREATE -eq 1 ]
+if [ $DO_CREATE -eq 1 ]
 then
-	# $PNAME's source code will probably be at /etc/
-	# When built, this variable will probably be here
-	
-	# Check that a directory has been specified
-	[ -z $DIR ] && err "No directory specified for new instance." $ERR_NODIR	
+	# Assume that this is always on when creating (for now)
+	DO_SES=1
 
-	# Create a name if not specified
-	[ -z $NAME ] && NAME=`basename $DIR`
+	# Use Apache's root directory as the default
+	if [ ! -z "$DIR" ]
+	then
+		echo $DIR
+		# Create a name if not specified
+		[ -z $NAME ] && NAME=`basename $DIR`
+	else 
+		# Names have always got to be specified
+		[ -z $NAME ] && err "No site name specified."
+
+		$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
+			err "Apache is misconfigured on this system... Can't get config..."
+		}
+
+		WWWROOT="$( \
+			$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG 2>/dev/null| \
+			grep 'Main DocumentRoot:'| \
+			awk '{ print $3 }' | \
+			sed 's/"//g' \
+		)"
+
+		DIR=$WWWROOT/${DOMAIN:-$NAME}
+	fi
 
 	# Then default all other variables if they were not specified.
 	SRC=$PREFIX
@@ -289,14 +363,14 @@ then
 		printf "Creating new $PNAME instance with the following parameters.\n"
 		#Uses Apache?  `test $NO_GIT -eq 1 && echo "No" || echo "Yes"`
 		cat <<EOF
-DIR         = $DIR
-BASEDIR     = $BASEDIR
-DATASOURCE  = $DATASOURCE
-DOMAIN      = $DOMAIN
-TITLE       = $TITLE
-DESCRIPTION = $DESCRIPTION
-
+Directory:    $DIR
+Base dir:     $BASEDIR
+Datasource:   $DATASOURCE
+Domain:       $DOMAIN
+Title:        $TITLE
 Uses Git?     `test $NO_GIT -eq 1 && echo "No" || echo "Yes"`
+Description:  
+	$DESCRIPTION
 EOF
 	}
 
@@ -345,12 +419,12 @@ EOF
 
 	# If we're on an Apple system, the sed commands will have to be different.
 	sed -i -e "{
-		s/__DATASOURCE__/${DATASOURCE}/
-		s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;
-		s;__BASE__;${BASEDIR:-"/"};
-		s/__NAME__/${NAME:-"anon"}/
-		s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/
-		s/__TITLE__/${TITLE:-"Titleless Website"}/
+		s/__DATASOURCE__/${DATASOURCE}/;
+		s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;;
+		s;__BASE__;${BASEDIR:-"/"};;
+		s/__NAME__/${NAME:-"anon"}/;
+		s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/;
+		s/__TITLE__/${TITLE:-"Titleless Website"}/;
 	}" $DIR/data.cfm
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
@@ -368,27 +442,11 @@ EOF
 		[ $VERBOSE -eq 1 ] && printf "\nCreating the Git repository for this project...\n"
 		touch $DIR/.gitignore
 		cd $DIR
-		git init
-		{
-		echo <<GIT
-# Filter out everything
-*
-
-# Explicitly add the framework's directories
-!api/*
-!app/*
-!assets/{css,js}/*
-!components/*
-!routes/*
-!setup/*
-!sql/*
-!std/*
-!views/*
-GIT
-		} > .gitignore
-		git add .
-		git commit -m "Standard first commit."
-		cd -
+		git init 1>/dev/null
+		cp $SHAREDIR/gitignore $DIR/.gitignore
+		git add -f . 1>/dev/null
+		git commit -m "Standard first commit." 1>/dev/null
+		[ $VERBOSE -eq 1 ] && cd - || cd - 1>/dev/null
 		[ $VERBOSE -eq 1 ] && echo DONE!
 	fi	
 fi
@@ -400,19 +458,26 @@ fi
 if [ $UPDATE -eq 1 ]
 then
 	# Checks 
-	[ ! -z "$DIR" ] || err "No application specified for update."
-	[   -d "$DIR" ] || \
-		err "The application at folder '$DIR' does not seem to exist or is not accessible." 1
-	[   -f "$DIR/$SYMNAME.cfc" ] || \
+	[ ! -z "$DIR" ] || { 
+		err "No application specified for update." 1
+	}
+
+	[ -d "$DIR" ] || {
+		printf "The application at folder '$DIR' " > /dev/stderr
+		printf "does not seem to exist or is not accessible." > /dev/stderr
+		exit 1
+	}
+
+	[ -f "$DIR/$SYMNAME.cfc" ] || {
 		err "The application at folder '$DIR' does not seem to be a Myst application." 1
+	}
 
 	# I don't really need Git to control rollbacks, it's nice, but not necessary
 	[ $VERBOSE -eq 1 ] && echo "Pulling latest copy of $SYMNAME repository."
 	# TODO: Do a simple HTTP GET for the latest version and untar.  These tools
 	# are more or less guaranteed to be present on a system, whereas Git won't.
 	git clone $SRCREPO /tmp/myst
-	#cd /tmp/myst/ && git checkout -b $STABLE_BRANCH && git pull github $STABLE_BRANCH && cd -
-	cd /tmp/myst/ && git checkout $STABLE_BRANCH && cd -
+	cd /tmp/myst/ && git checkout $STABLE_BRANCH && cd - 1>/dev/null
 	mv $MV_FLAGS $DIR/myst.cfc $DIR/myst_.cfc
 	cp $CP_FLAGS /tmp/myst/myst.cfc $DIR/
 	# Right now, the user will need to look before he/she leaps and merge Application.cfc manually
@@ -424,177 +489,150 @@ then
 fi
 
 
-# Generate additional Tomcat hosts
-if [ 0 -eq 1 ]
-then
-	#Generate the scaffolding for a new VirtualHost for Lucee
-	HOST_CONTENT=$(cat <<LUCEE_HOST
-	\t\t<!-- #BEGIN:$NAME -->\n\t\t<Host name="${NAME}" appBase="webapps">\n\t\t\t<Context path="" docBase="${DIR}" />\n\t\t\t<Alias>${DEV_ALIAS}</Alias>\n\t\t</Host>\n\t\t<!-- #END:$NAME -->\n
-LUCEE_HOST
-	) #This is the end of variable declaration
-
-	#Create a new VirtualHost for Lucee
-	#sed -i "{ s|\(<!-- ADD NEW HOSTS HERE -->\)|\1\n${HOST_CONTENT}| }" $LUCEE_CONF
-fi
-
-
-
-# ACTIVATE NEW CMVC INSTANCES
-if [ $ACTIVATE -eq 1 ]
-then
-	#
-	[ $VERBOSE -eq 1 ] && printf "Checking for valid $PNAME instance '$THIS_SITE'...\n" 
-
-	# Could be thrown after --create, so prefill
-	THIS_SITE="${THIS_SITE:-$DIR}"
-
-	# Check for the folder 
-	test ! -z "$THIS_SITE" || err "Folder not specified...\n" 1
-
-	# Check that it's not an option...
-	[ "${THIS_SITE:0:1}" == "-" ] && err "No folder supplied, got option flag...\n" 1
-
-	# Check that it's a real folder
-	test -d "$THIS_SITE" || err "Folder does not exist...\n" 1
-
-	# Check that it's an instance
-	test -d "$THIS_SITE/app" && test -d "$THIS_SITE/views" || err "Folder is not a $PNAME instance...\n" 1
-		
-	# Check that the files we need to move exist
-	test -f $THIS_SITE/app/default.cfm || err "Default model file may have already been modified...\n" 1
-	test -f $THIS_SITE/views/default.cfm || err "Default model file may have already been modified...\n"
-
-	# MD5s
-	# 40f7640ea4c8c584ca8dca6e9d6de90f  app-default.cfm
-	# 0e43c92b7c7091c0f293cba12d2fd103  views-default.cfm
-	APPD_MD5="40f7640ea4c8c584ca8dca6e9d6de90f"
-	VIEWD_MD5="0e43c92b7c7091c0f293cba12d2fd103"
-	APPD_NEW_MD5=`md5sum $THIS_SITE/app/default.cfm | awk '{ print $1 }'`
-	VIEWD_NEW_MD5=`md5sum $THIS_SITE/views/default.cfm | awk '{ print $1 }'`
-	#echo $APPD_NEW_MD5 $APPD_MD5
-	
-	# Check the files	
-	[ $VERBOSE -eq 1 ] && printf "Checking for valid checksums...\n" 
-	[[ $APPD_NEW_MD5 != $APPD_MD5 ]] || { printf "Default model file may have already been modified...\n"; exit 1; }
-	[[ $VIEWD_NEW_MD5 != $VIEWD_MD5 ]] || { printf "Default model file may have already been modified...\n"; exit 1; }
-
-	# Move both files to the std directory under a differnet name
-	[ $VERBOSE -eq 1 ] && printf "Moving files...\n" 
-	mv $MV_FLAGS $THIS_SITE/app/default.cfm $THIS_SITE/std/app-default.cfm	
-	mv $MV_FLAGS $THIS_SITE/views/default.cfm $THIS_SITE/std/views-default.cfm	
-
-	# Make some new ones
-	touch $THIS_SITE/app/default.cfm
-	touch $THIS_SITE/views/default.cfm
-	[ $VERBOSE -eq 1 ] && printf "Done.\n" 
-fi
-
-
 # Generate SES urls for Apache hosts
 if [ $DO_SES -eq 1 ]
 then
 	# Make sure the user specified a directory
-	[ ! -z "$DIR" ] || err "No directory specified for extension-less URL setup..." 1
-	[ ! -z "${DOMAIN:-$NAME}" ] || err "No domain or site name specified for extension-less URL setup..." 1
-	[[ ! -z "$ENGINE" ]] || err "No server specified for extension-less URL setup..." 1
+	[ ! -z "$DIR" ] || {
+		err "No directory specified for extension-less URL setup..." 1
+	}
 
-	# Make/add to an .htaccess file
-	if [ $APACHIFY -eq 1 ]
-	then
-		{
-			cat <<EOF
-# .htaccess for site titled '${DOMAIN:-$NAME}', generated `date`
-RewriteEngine on
-RewriteRule ^/?([a-z]+)$ \$1.cfm [L]
-EOF
-		} >> $DIR/.htaccess
-	fi
+	[ ! -z "${DOMAIN:-$NAME}" ] || {
+		err "No domain or site name specified for extension-less URL setup..." 1
+	}
+	
+	# Prepare the new htaccess file
+	sed -e "{
+		s/@@domain@@/${DOMAIN:-$NAME}/;
+		s/@@date@@/`date`/;
+	}" $SHAREDIR/default.htaccess > $DIR/.htaccess
 
 	# Add the .htaccess to the repository if .git is activated
-	if [ $CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
+	if [ $DO_CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
 	then
 		cd $DIR
-		git add .htaccess
-		git commit -m "Added .htaccess file for URL handling."
-		cd -
+		git add -f .htaccess
+		git commit -m "Added .htaccess file for URL handling." 1>/dev/null
+		[ $VERBOSE -eq 1 ] && cd - || cd - 1>/dev/null
 	fi
 fi 
 
 
 # Create a virtual host for the server engine in use.
-if [ $DO_GENVHOST -eq 1 ] || [ $CREATE -eq 1 ]
+if [ $DO_GENVHOST -eq 1 ] || [ $DO_CREATE -eq 1 ]
 then
-	# Make sure the user specified a directory
-	# [ ! -z "$DIR" ] || err "No directory specified for vhost..." 1
-	# Make sure that directory exists
-	#[ -d "$DIR" ] || err "Directory does not exist, invalid vhost..." 1;
-	# Check that at least one server is specified
-	[ $APACHIFY -eq 1 ] || err "No server specified. (Try --apachify)" 1
+	# Check if we can grab the configuration details
+	$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
+		err "Apache is misconfigured on this system... Can't generate virtualhost."
+	}
 
-	# Generate an Apache virtual host
-	if [ $APACHIFY -eq 1 ]
+	# Get some configuration details
+	APACHE_DOCROOT="$( \
+		$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG 2>/dev/null| \
+		grep 'DocumentRoot:'| \
+		awk '{ print $3 }' | \
+		sed 's/"//g' \
+	)"
+
+	# Name should probably not be turned off
+	[ ! -z "${DOMAIN:-$NAME}" ] || {
+		err "No domain or site name specified for vitual host..." 1
+	}
+
+	# If this is a CREATE run, we'll generate a virtual host and put it in misc/
+	[ $DO_CREATE -eq 1 ] && VHOST_FILE=$DIR/misc/apache.vhost
+
+	# Virtual host
+	sed -e "{
+		s;@@SITEDOMAIN@@;${DOMAIN:-$NAME};;
+		s;@@SITENAME@@;${DOMAIN:-$NAME};;
+		s;@@ALIASDOMAIN@@;${DOMAIN:-$NAME};
+		s;@@WWWROOT@@;${APACHE_DOCROOT};;
+		s;@@DATE@@;$( date );;
+	}" $SHAREDIR/default.vhost > $VHOST_FILE 
+
+	# Link to virtual-hosts (this is going to work differently on production)
+#	ln -s $VHOST_FILE $PREFIX/virt-hosts-available/$NAME || {
+#		printf "Failed to create the folder?"
+		#This should be deleted?
+#	}
+
+	# Lastly, if this is a CREATE run and we haven't done any work, add this file too. 
+	if [ $DO_CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
 	then
-		# Get some configuration details
-		httpd -t -D DUMP_RUN_CFG || err "Apache is misconfigured on this system... Can't generate virtualhost."
-		APACHE_DOCROOT="`httpd -t -D DUMP_RUN_CFG 2>/dev/null|grep 'DocumentRoot:'| awk '{ print $3 }' | sed 's/"//g' `"
+		cd $DIR
+		git add -f misc/apache.vhost
+		git commit -m "Added Apache virtual host template." 1>/dev/null
+		[ $VERBOSE -eq 1 ] && cd - || cd - 1>/dev/null
+	fi
+fi
 
-		# Name should probably not be turned off
-		#[ ! -z "$DOMAIN" ] || err "No name specified for vhost..." 1
-		[ ! -z "${DOMAIN:-$NAME}" ] || err "No domain or site name specified for vitual host..." 1
 
-		# If this is a CREATE run, we'll generate a virtual host and put it in misc/
-		[ $CREATE -eq 1 ] && VHOST_FILE=$DIR/misc/apache.vhost
-
-		# Virtual host file 
-		{
-	cat <<EOF
-# Apache virtual host for site titled '${DOMAIN:-$NAME}', generated `date`
-<VirtualHost *:80>
-	# Admin email, Server Name (domain name) and any aliases
-	ServerName  ${DOMAIN:-$NAME}
-	ServerAlias www.${DOMAIN:-$NAME}
-
-	# Index file and Document Root (where the public files are located)
-	DocumentRoot $APACHE_DOCROOT/${DOMAIN:-$NAME}/
-
-	# Custom log file locations
-	LogLevel warn
-	ErrorLog  $APACHE_DOCROOT/${DOMAIN:-$NAME}/log/srvError.log
-	CustomLog $APACHE_DOCROOT/${DOMAIN:-$NAME}/log/srvAccess.log combined
-
-EOF
-
-		# Index
-		cat <<EOF
-	# Auto directory
-	DirectoryIndex index.cfm index.html
-</VirtualHost>
-EOF
-		} > $VHOST_FILE
-
-		# Lastly, if this is a CREATE run and we haven't done any work, add this file too. 
-		if [ $CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
+# Activate a host (for old sites, or previously disabled ones)
+if [ $DO_ACTIVATE -eq 1 ]
+then
+	if [ $DO_CREATE -eq 1 ]
+	then
+		# DOMAIN and NAME checks are mostly useless, b/c we've already caught them here.	
+		[ $VERBOSE -eq 1 ] && printf "Activating site '%s'\n" ${DOMAIN:-$NAME}
+	else
+		if [ -z "$DIR" ]
 		then
-			cd $DIR
-			git add misc/apache.vhost
-			git commit -m "Added Apache virtual host template."
-			cd -
+			# If no directory was specified I can figure it out
+			[ -z "${DOMAIN:-$NAME}" ] && err "No site domain or name specified."
+
+			# Absolute directories can be specified, but aren't needed anymore.
+			DIR=$HTTPD_PREFIX/htdocs/${DOMAIN:-$NAME}
+
+			# Check for domain and/or name?
+			[ $VERBOSE -eq 1 ] && printf "Activating site '%s'\n" ${DOMAIN:-$NAME}
 		fi
 	fi
+
+	# If this file doesn't exist for whatever reason, it's a problem.
+	VHOST_FILE=$DIR/misc/apache.vhost
+	if [ -f "$VHOST_FILE" ]
+	then
+		ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} || {
+			printf "Failed to create the link"
+			exit 1	
+		}
+	fi	
+fi
+
+
+# Enable hosts 
+if [ $DO_ENABLE -eq 1 ]
+then
+	[ -z "$NAME" ] && err "No site specified."
+	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" $NAME
+	ln -s $PREFIX/virt-hosts-available/$NAME $PREFIX/virt-hosts-enabled/
+fi
+
+
+# Disable hosts 
+if [ $DO_DISABLE -eq 1 ]
+then
+	[ -z "$NAME" ] && err "No site specified."
+	[ $VERBOSE -eq 1 ] && printf "Disabling site '%s'\n" $NAME
+	echo rm -f $PREFIX/virt-hosts-enabled/$NAME
 fi
 
 
 # The finalize command
 if [ $DO_FINALIZE -eq 1 ]
 then
-	[ ! -z "$DIR" ] || err "No application specified for finalizing."
-	[   -d "$DIR" ] || \
+	[ ! -z "$DIR" ] || {
+		err "No application specified for finalizing." 1
+	}
+	[ -d "$DIR" ] || {
 		err "The application at folder '$DIR' does not seem to exist or is not accessible." 1
-	[   -f "$DIR/$SYMNAME.cfc" ] || \
+	}
+	[ -f "$DIR/$SYMNAME.cfc" ] || {
 		err "The application at folder '$DIR' does not seem to be a Myst application." 1
+	}
 
 	# Check that it's not the same
-	#memcmp( );
 	RENAME=0
 	if [ ! -f $DIR/app/default.cfm ]
 	then

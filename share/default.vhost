@@ -11,8 +11,6 @@
 	LogLevel warn
 	ErrorLog @@WWWROOT@@/@@SITENAME@@/log/srvError.log
 	CustomLog @@WWWROOT@@/@@SITENAME@@/log/srvAccess.log combined
-	#ErrorLog  /srv/http/testvh/log/srvError.log
-	#CustomLog /srv/http/testvh/log/srvAccess.log combined
 
 	# Index
 	DirectoryIndex index.cfm index.html

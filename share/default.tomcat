@@ -1,0 +1,6 @@
+<!-- #BEGIN:@@name@@ -->
+	<Host name="@@name@@" appBase="webapps">
+		<Context path="" docBase="@@dir@@" />
+		<Alias>@@alias</Alias>
+	</Host>
+<!-- #END:@@name@@ -->
