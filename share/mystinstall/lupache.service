@@ -1,0 +1,16 @@
+# Localized HTTPD service
+[Unit]
+Description="Lucee's own Apache server."
+After=network.target
+
+[Service]
+Type=forking
+KillMode=mixed
+ExecStart=@@HTTPD_DIR@@/httpd -k start
+ExecStop=@@HTTPD_DIR@@/httpd -k graceful-stop 
+ExecReload=@@HTTPD_DIR@@/httpd -k graceful
+#User=@@USER@@
+#Group=@@GROUP@@
+
+[Install]
+WantedBy=multi-user.target

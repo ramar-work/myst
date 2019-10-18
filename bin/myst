@@ -14,7 +14,7 @@
 # 
 # Usage
 # -----
-# ???
+# TBD
 # 	
 # TODO
 # ----
@@ -150,18 +150,6 @@ do
 		--apache|--apachify)
 			APACHIFY=1
 			ENGINE='apache'
-		;;
-
-		# Generate server confiuguration files for an nginx server 
-		--nginx|--nginxify)
-			NGINXIFY=1
-			ENGINE='nginx'
-		;;
-
-		# Generate server confiuguration files for a Microsoft IIS server 
-		--iis|--iisify)
-			IISIFY=1
-			ENGINE='iis'
 		;;
 
 		# Enable the capacity to serve SES URLs via server configuration
