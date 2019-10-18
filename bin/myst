@@ -75,7 +75,7 @@ $PROGRAM_NAME:
 Instance options:
 -c, --create             Create a new instance. 
 -u, --update <arg>       Update the instance at <arg>. 
-    --activate <dir>     Activate a site (turn off defaults that ship with new projects)
+-a, --activate <dir>     Activate a site (turn off defaults that ship with new projects)
     --no-git             Don't create a Git repo.
 -e, --enable             Enable this host 
 -x, --disable            Disable this host
@@ -194,7 +194,7 @@ do
 		;;
 
 		# Turn off the 'default' that ships
-		--activate)
+		-a|--activate)
 			DO_ACTIVATE=1
 #			CODE=`detFlag "$2"`;
 #			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
@@ -571,26 +571,25 @@ fi
 # Activate a host (for old sites, or previously disabled ones)
 if [ $DO_ACTIVATE -eq 1 ]
 then
-	if [ $DO_CREATE -eq 1 ]
+	# Did we call DO_CREATE?
+	if [ -z "$VHOST_FILE" ]
 	then
-		# DOMAIN and NAME checks are mostly useless, b/c we've already caught them here.	
-		[ $VERBOSE -eq 1 ] && printf "Activating site '%s'\n" ${DOMAIN:-$NAME}
-	else
+		#In this case, I have to specify a Domain or Name 
+		[ -z "${DOMAIN:-$NAME}" ] && err "No site domain or name specified."
+
+		#If this is not done, figure it out
 		if [ -z "$DIR" ]
 		then
-			# If no directory was specified I can figure it out
-			[ -z "${DOMAIN:-$NAME}" ] && err "No site domain or name specified."
-
 			# Absolute directories can be specified, but aren't needed anymore.
 			DIR=$HTTPD_PREFIX/htdocs/${DOMAIN:-$NAME}
 
 			# Check for domain and/or name?
 			[ $VERBOSE -eq 1 ] && printf "Activating site '%s'\n" ${DOMAIN:-$NAME}
 		fi
+		VHOST_FILE=$DIR/misc/apache.vhost
 	fi
 
 	# If this file doesn't exist for whatever reason, it's a problem.
-	VHOST_FILE=$DIR/misc/apache.vhost
 	if [ -f "$VHOST_FILE" ]
 	then
 		ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} || {
@@ -604,9 +603,12 @@ fi
 # Enable hosts 
 if [ $DO_ENABLE -eq 1 ]
 then
-	[ -z "$NAME" ] && err "No site specified."
-	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" $NAME
-	ln -s $PREFIX/virt-hosts-available/$NAME $PREFIX/virt-hosts-enabled/
+	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
+	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" ${DOMAIN:-$NAME}
+	ln -s $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} $PREFIX/virt-hosts-enabled/ || {
+		printf "Failed to enable site %s." ${DOMAIN:-$NAME}
+		exit 1	
+	}
 fi
 
 
@@ -615,7 +617,10 @@ if [ $DO_DISABLE -eq 1 ]
 then
 	[ -z "$NAME" ] && err "No site specified."
 	[ $VERBOSE -eq 1 ] && printf "Disabling site '%s'\n" $NAME
-	echo rm -f $PREFIX/virt-hosts-enabled/$NAME
+	echo rm -f $PREFIX/virt-hosts-enabled/$NAME || {
+		printf "Failed to disable site"
+		exit 1	
+	}
 fi
 
 
