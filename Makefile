@@ -33,9 +33,9 @@ LUCEE_PREFIX=/tmp/myst
 TOMCAT_SHUTDOWN_PORT=8005
 TOMCAT_PORT=8888
 TOMCAT_AJP_PORT=8009
-TOMCAT_SECRET_KEY=$(shell head -c 32 /dev/urandom | xxd -ps -c 64)
 TOMCAT_MINHEAP=64
 TOMCAT_MAXHEAP=2048
+TOMCAT_CONFIG=$(LP)/tomcat.key
 
 #All the Apache stuff is here
 FILE_BASE=./share/mystinstall
@@ -49,6 +49,7 @@ CONF_FILE=/etc/myst.conf
 HTTP_PORT=80
 HTTPS_PORT=443
 SERVER_ROOT=$(HTTPD_PREFIX)
+
 
 # top: Check for depdencies, build local version of httpd & grab the newest Lucee 
 top:
@@ -136,10 +137,12 @@ retrieve-lucee:
 install:
 	test -d $(PREFIX) || mkdir -p $(PREFIX)/{share,share/man,bin}/
 	mkdir -pv $(PREFIX)/share/$(NAME)/
+	@head -c 32 /dev/urandom | xxd -ps -c 64 > $(TOMCAT_CONFIG)
 	@echo Installing localized Apache...
 	make httpd-install
 	@echo Installing Lucee...
 	make lucee-install
+	@rm -f $(TOMCAT_CONFIG)
 	@echo Installing Myst configuration...
 	make config-install
 	@echo Installing test project...
@@ -194,9 +197,10 @@ httpd-install:
 	test -d $(PREFIX)/virt-hosts-enabled || mkdir -p $(PREFIX)/virt-hosts-enabled/
 	ln -s $(PREFIX)/virt-hosts-enabled $(PREFIX)/httpd/conf/extra/vhosts
 	cp $(FILE_BASE)/mod_cfml.so $(HTTPD_LIBDIR)/
+	TOMCAT_KEY=`cat $(TOMCAT_CONFIG)` && \
 	sed -e "{ \
 		s/@@PROXYPORT@@/$(TOMCAT_PORT)/; \
-		s/@@SECRETKEY@@/${TOMCAT_SECRET_KEY}/ \
+		s/@@SECRETKEY@@/$$TOMCAT_KEY/ \
 	}" $(FILE_BASE)/httpd-cfml.conf > $(HTTPD_CONFDIR)/extra/httpd-cfml.conf
 	sed -i -e '$$ a # Include CFML settings in one file' $(HTTPD_CONFDIR)/httpd.conf
 	sed -i -e '$$ a Include conf/extra/httpd-cfml.conf' $(HTTPD_CONFDIR)/httpd.conf
@@ -230,11 +234,12 @@ lucee-install:
 		--bittype 64
 	mkdir -p $(PREFIX)/jdk/
 	test -h $(PREFIX)/jdk/jre || ln -s $(PREFIX)/jre64-lin/jre $(PREFIX)/jdk/
+	TOMCAT_KEY=`cat $(TOMCAT_CONFIG)` && \
 	sed -i -e "{ \
 		s/@@tomcatshutdownport@@/$(TOMCAT_SHUTDOWN_PORT)/; \
 		s/@@tomcatport@@/$(TOMCAT_PORT)/; \
 		s/@@tomcatajpport@@/$(TOMCAT_AJP_PORT)/; \
-		s/@@secretkey@@/${TOMCAT_SECRET_KEY}/; \
+		s/@@secretkey@@/$$TOMCAT_KEY/; \
 	}" $(PREFIX)/tomcat/conf/server.xml
 	sed -i -e "{ \
 		s/@@minheap@@/$(TOMCAT_MINHEAP)/; \

@@ -32,6 +32,11 @@ or via Github at <a href="https://github.com/tubularmodular/myst">https://github
 2. Now, we can install Myst and it's accompanying files. 
 	<pre>
 	$ cd myst 
+	$ make
+	</pre>
+
+3. Provided there were no errors, you can now run install as root (or use sudo)
+	<pre>
 	$ make install    # You'll probably need to be root
 	</pre>
 
@@ -41,29 +46,14 @@ or via Github at <a href="https://github.com/tubularmodular/myst">https://github
 	$ make uninstall  # NOTE: You'll probably need to be root again
 	</pre>
 
-3. Myst has been heavily tested with Tomcat and Apache and running it with either
-	 of those servers will yield the best results.  If you do not have Apache
-	already running on your system, it will be easiest to use Lucee's built-in
-	Tomcat server.  The following commands will install Myst in your system's /opt 
-	directory.
-	<pre>
-	# Output of this command will let you know that Myst was installed and is in your $PATH
-	$ myst -h         
-	$ mystinstall --full-install --prefix /opt/myst --user http
-	</pre>
-
 
 ### Builds On
 
-Myst is administered via shell script right now, and has been tested most
-heavily on different distributions of Linux.  I plan to resume Apple OS, 
-Cygwin and Windows 10 testing in the next two months.   However, this also means
-that Linux users will have the best results with this application for a little
-while.
-<!-- Windows users will need either <a
-href="https://git-for-windows.github.io">Git Bash</a> or <a
-href="https://www.cygwin.com">Cygwin</a> to run the tooling at the moment.  
--->
+Linux only for now.  
+
+OSX is as yet untested, and users may run into issues with Lucee.  The build process also depends on specific versions of the shell and must use Bash.
+
+Windows is also untested, but Cygwin users may be in good shape.
 
 
 Setting up your first Myst project
