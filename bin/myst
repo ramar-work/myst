@@ -75,7 +75,7 @@ $PROGRAM_NAME:
 Instance options:
 -c, --create             Create a new instance. 
 -u, --update <arg>       Update the instance at <arg>. 
--a, --activate <dir>     Activate a site (turn off defaults that ship with new projects)
+-a, --activate           Activate a site (turn off defaults that ship with new projects)
     --no-git             Don't create a Git repo.
 -e, --enable             Enable this host 
 -x, --disable            Disable this host
@@ -302,18 +302,14 @@ do
 	shift
 done
 
-
-
-#$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG 2>/dev/null
-#$HTTPD_PREFIX/conf
-#ls $PREFIX/virt-hosts-available
-#exit
-
 # Handle verbosity
 [ $VERBOSE -eq 1 ] && MKDIR_FLAGS="-pv" || MKDIR_FLAGS="-p"
 [ $VERBOSE -eq 1 ] && CP_FLAGS="-v" || CP_FLAGS=""
 [ $VERBOSE -eq 1 ] && MV_FLAGS="-v" || MV_FLAGS=""
 
+# Set things that could not be set as const values
+SRC=$PREFIX
+SHAREDIR=$SRC/share/$SYMNAME
 
 # CREATE NEW CMVC INSTANCES
 if [ $DO_CREATE -eq 1 ]
@@ -346,8 +342,6 @@ then
 	fi
 
 	# Then default all other variables if they were not specified.
-	SRC=$PREFIX
-	SHAREDIR=$SRC/share/$SYMNAME
 	DATASOURCE=${DATASOURCE:-"(none)"}
 	TITLE=${TITLE:-"$NAME"}
 	DOMAIN=${DOMAIN:-"$NAME"}
@@ -606,7 +600,7 @@ then
 	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
 	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" ${DOMAIN:-$NAME}
 	ln -s $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} $PREFIX/virt-hosts-enabled/ || {
-		printf "Failed to enable site %s." ${DOMAIN:-$NAME}
+		printf "Failed to enable site: %s." ${DOMAIN:-$NAME}
 		exit 1	
 	}
 fi
@@ -615,10 +609,10 @@ fi
 # Disable hosts 
 if [ $DO_DISABLE -eq 1 ]
 then
-	[ -z "$NAME" ] && err "No site specified."
-	[ $VERBOSE -eq 1 ] && printf "Disabling site '%s'\n" $NAME
-	echo rm -f $PREFIX/virt-hosts-enabled/$NAME || {
-		printf "Failed to disable site"
+	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
+	[ $VERBOSE -eq 1 ] && printf "Disabling site '%s'\n" ${DOMAIN:-$NAME}
+	echo rm -f $PREFIX/virt-hosts-enabled/${DOMAIN:-$NAME} || {
+		printf "Failed to disable site: %s." ${DOMAIN:-$NAME}
 		exit 1	
 	}
 fi

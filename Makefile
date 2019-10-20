@@ -261,6 +261,7 @@ lucee-install:
 		--bittype 64
 	mkdir -p $(PREFIX)/jdk/
 	test -h $(PREFIX)/jdk/jre || ln -s $(PREFIX)/jre64-lin/jre $(PREFIX)/jdk/
+	touch $(TOMCAT_CONFIG) && \
 	TOMCAT_KEY=`cat $(TOMCAT_CONFIG)` && \
 	sed -i -e "{ \
 		s/@@tomcatshutdownport@@/$(TOMCAT_SHUTDOWN_PORT)/; \

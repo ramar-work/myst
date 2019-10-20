@@ -8,6 +8,7 @@ tmp/
 *.class
 !img/*.png
 TODO.md
+configure
 
 # until these make some headway, let's leave them out of the repo
 bin/mysttest
