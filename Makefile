@@ -7,6 +7,7 @@ MANDIR=${PREFIX}/share/man
 BINDIR=$(PREFIX)/bin
 CONFIG=/etc
 WILDCARD=*
+FORCE_INSTALL=0
 
 #PREFIX=/usr/local
 #LUCEE_PREFIX=$(PREFIX)/$(NAME)2
@@ -148,6 +149,8 @@ retrieve-lucee:
 
 
 # install: Install the myst package on a new system
+#	ln -s $(HTTPD_SRVDIR)
+# test -d $(PREFIX) && printf "WARNING: You have already installed myst.\n" > /dev/stderr
 install:
 	test -d $(PREFIX) || mkdir -p $(PREFIX)/{share,share/man,bin}/
 	mkdir -pv $(PREFIX)/share/$(NAME)/
@@ -182,6 +185,7 @@ config-install:
 
 # bin-install: Move all the scripts to the right place
 bin-install:
+	test -d $(PREFIX)/bin/ || mkdir $(PREFIX)/bin/
 	cp -rf ./bin/$(WILDCARD) $(PREFIX)/bin/
 
 
@@ -215,8 +219,14 @@ https-test-install:
 #
 # httpd-install: Install the localized HTTPD to a real system folder, delete its documentation as well.
 httpd-install:
-	test -d $(PREFIX)/httpd || mkdir -p  $(PREFIX)/httpd
+	test -d $(PREFIX)/httpd || mkdir -p $(PREFIX)/httpd/
+	test -d $(PREFIX)/www || mkdir -p $(PREFIX)/www/
 	cd vendor/$(HTTPDV)/ && make install
+	mv $(PREFIX)/httpd/htdocs/* $(PREFIX)/www/
+	chown -R $(USER):$(GROUP) $(PREFIX)/www/
+	rmdir $(PREFIX)/httpd/htdocs/ 
+	ln -s $(PREFIX)/www/ $(PREFIX)/httpd/htdocs
+	chown $(USER):$(GROUP) $(PREFIX)/httpd/htdocs
 	test -d $(PREFIX)/httpd/man && rm -rf $(PREFIX)/httpd/man/ 
 	test -d $(PREFIX)/httpd/manual && rm -rf $(PREFIX)/httpd/manual/ 
 	test -d $(PREFIX)/virt-hosts-available || mkdir -p $(PREFIX)/virt-hosts-available/
@@ -307,12 +317,20 @@ systemd-stop:
 
 
 # uninstall - Uninstall the myst package on a new system
+# TODO: Add a check for any sites in virt-hosts-{ available, enabled }
 uninstall:
 	-systemctl disable myst 
 	-rm -f /usr/lib/systemd/system/myst.service
 	-systemctl disable lupache 
 	-rm -f /usr/lib/systemd/system/lupache.service
-	-rm -rf /opt/myst2/
+	-rm -rf $(PREFIX)/{bin,httpd,jdk,jre,lib,share,sys,tomcat}/
+	-rm -f $(PREFIX)/* 2>/dev/null
+
+
+# total-uninstall - Get rid of sites directory too (not a good idea)
+total-uninstall:
+	-@make uninstall
+	-rm -rf $(PREFIX)/
 
 
 # list - List all the targets and what they do
