@@ -133,7 +133,32 @@ accessors=true
 
 		//Set all other base properties
 		for ( var vv in ListToArray("realname,namespace,debuggable,datasource")) {
-			if ( /*!StructKeyExists(variables,vv) && */StructKeyExists(arguments, vv) && arguments[vv] neq "" ) variables[vv] = arguments[vv];
+			if ( StructKeyExists(arguments, vv) && arguments[vv] neq "" ) {
+				variables[vv] = arguments[vv];
+			}
+		}
+
+		//Loop through all the properties and methods, resetting whatever needs to be set
+		//Add overrides folder objects here
+		if ( DirectoryExists( "#getMyst().getRootDir()#overrides" ) ) {
+			if ( FileExists( "#getMyst().getRootDir()#overrides/#realname#.cfc" ) ) { 
+				var ovr = createObject( "component", "overrides.#realname#" );
+				//NOTE: getMyst() will probably not work...
+				for ( var k in ovr ) {
+					//If the word starts w/ set or get, it's probably a property
+					if ( Left( k, 3 ) == "get" ) {
+						//TODO: This is pretty ugly... 
+						var setter = Replace( k, "g", "s" ); 
+						this[ setter ]( ovr[ k ]() );
+					}
+					else if ( Left( k, 3 ) == "set" ) {
+						; //Skip this obviously...
+					}
+					else {
+						this[ k ] = ovr[ k ];
+					}
+				}
+			}
 		}
 
 		//Finally tell me (in a window) which module this is
