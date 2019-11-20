@@ -293,6 +293,7 @@ then
 	MODPATH=$FROMPATH	
 fi
 
+
 if [ $DO_EXTRACT -eq 1 ] 
 then
 	FOLDER=$FROMPATH
@@ -316,7 +317,7 @@ then
 	test ! -z $MODNAME || err "No module name specified." 1
 	test ! -z $DIR || err "No directory specified." 1
 
-	mkdir -pv $DIR/{api,app,components,db,misc,setup,sql,std,views}/$MODNAME/
+	mkdir -pv $DIR/{api,app,components,db,misc,overrides,setup,sql,std,views}/$MODNAME/
 	mkdir -pv $DIR/assets/{css,js,img}/$MODNAME/
 	mkdir -v $DIR/routes/
 
@@ -449,7 +450,7 @@ then
 	else
 		[ -z "$MODPATH" ] && err "No path specified for creation of new module (use --to)." 1
 		[ -d "$MODPATH" ] && err "Module path directory already exists. Refusing to overwrite existing directory." 1
-		mkdir $MKDIRFLAGS $MODPATH/{api,app,assets,components,db,routes,setup,sql,std,views}/ \
+		mkdir $MKDIRFLAGS $MODPATH/{api,app,assets,components,db,overrides,routes,setup,sql,std,views}/ \
 			|| err "Failed to create directory $MODPATH" 1
 	fi
 
@@ -457,7 +458,7 @@ then
 	#echo $MODNAME $FOLDER $MODPATH
 
 	# Copy each of the module's directories
-	for ff in api app assets misc setup sql views; do
+	for ff in api app assets misc overrides setup sql views; do
 		# If a dir doesn't exist, warn the user that you need the create option
 		[ ! -d $FOLDER/$ff/ ] && {
 			err "$FOLDER/$ff does not exist.  If you are trying to extract a module into a new directory, use --new in conjunction with the flags used to get here." 

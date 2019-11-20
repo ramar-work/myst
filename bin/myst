@@ -43,7 +43,7 @@ THIS_SITE=
 SRC=.
 DO_SES=0
 DO_GENVHOST=0
-DO_ACTIVATE=0
+usO_ACTIVATE=0
 DO_CREATE=0
 UPDATE=0
 NO_GIT=0
@@ -370,7 +370,7 @@ EOF
 
 	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
-	mkdir $MKDIR_FLAGS $DIR/{api,app,assets,components,db,files,log,misc,routes,setup,sql,std,views}/
+	mkdir $MKDIR_FLAGS $DIR/{api,app,assets,components,db,files,log,misc,overrides,routes,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,img,js}/
 	mkdir $MKDIR_FLAGS $DIR/db/static/
 	mkdir $MKDIR_FLAGS $DIR/std/custom/
@@ -392,7 +392,7 @@ EOF
 
 	# Set up Application redirects
 	[ $VERBOSE -eq 1 ] && printf "\n* Setting up redirects...\n"
-	for _d in app components db log files misc routes setup sql std views
+	for _d in app components db log files misc overrides routes setup sql std views
 	do 
 		[ $VERBOSE -eq 1 ] && echo cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
 		cp $SHAREDIR/Application-Redirect.cfc $DIR/$_d/Application.cfc
@@ -584,13 +584,25 @@ then
 	fi
 
 	# If this file doesn't exist for whatever reason, it's a problem.
-	if [ -f "$VHOST_FILE" ]
+	if [ ! -f "$VHOST_FILE" ]
 	then
-		ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} || {
-			printf "Failed to create the link"
-			exit 1	
+		mkdir $DIR/misc/ || {
+			printf "Could not create configuration directory for specified instance at: $DIR" > /dev/stderr
+			exit 1
 		}
-	fi	
+
+		# Call yourself and create it
+		$0 --virtual-host - > $VHOST_FILE || {
+			printf "Could not create new virtual host for instance at: $DIR" >/dev/stderr
+			exit 1
+		}
+	fi
+
+	# This file ought to exist now, but something can still go wrong		
+	ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} || {
+		printf "Failed to enable site at: $DIR"
+		exit 1	
+	}
 fi
 
 
@@ -652,4 +664,5 @@ then
 fi
 
 
+exit 0
 # vim: ff=unix
