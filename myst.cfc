@@ -912,8 +912,8 @@ accessors=true
 		var finalContent;
 
 		//Handle errors of different exception types
-		if ( !StructKeyExists( errors, "type" ) )
-			errorContent = "An '#errors.type#' error has occurred.";
+		if ( !StructKeyExists( arguments.errors, "type" ) )
+			errorContent = "An undefined error has occurred.";
 		else if ( errors.type eq "Application" )
 			errorContent = "An '#errors.type#' error has occurred.";
 		else if ( errors.type eq "Database" )
@@ -933,7 +933,7 @@ accessors=true
 		else if ( errors.type eq "Any" )
 			errorContent = "An '#errors.type#' error has occurred.";
 		else {
-			errorContent = "An '#errors.type#' error has occurred.";
+			errorContent = "A '#errors.type#' error has occurred.";
 		}
 
 		//Packaging the full custom error will have happened in the above steps
@@ -949,8 +949,12 @@ accessors=true
 			headline = arguments.content
 		 ,errorDescription = errorContent
 		 ,errorMessage = errors.message
-		 ,stackTrace = errors.stackTrace
+		 ,stackTrace = "None" 
 		};
+
+		if ( StructKeyExists( errors, "stackTrace" ) ) {
+			localErr.stackTrace = errors.stackTrace;
+		}
 
 		//we can have a "blank" page, the default w/ no styling
 		//we can have a custom page, where a user defined error can be loaded
@@ -1010,7 +1014,12 @@ accessors=true
 
 		//Server errors
 		else if ( arguments.status > 499 && !StructIsEmpty( arguments.err ) )
-			errorHandler( mime="text/html", status=arguments.status, content='something awful', errors=arguments.err );
+			errorHandler( 
+				mime="text/html", 
+				status=arguments.status, 
+				content='something awful', 
+				errors=arguments.err 
+			);
 		
 		else {
 			//we should never get here, but handle it anyway
@@ -1018,6 +1027,7 @@ accessors=true
 				mime="text/html", 
 				status=500,
 				content="renderPage caller error...",
+				errors=arguments.err,
 				extraContent=[
 					"Check the 'status' key supplied to the method and " & 
 					"ensure that a valid HTTP Status is used." 
@@ -1292,15 +1302,17 @@ accessors=true
 			if ( !StructKeyExists( rd, "view" ) ) {
 				renderPage( 
 					status=500
-				, err={} 
 				, content="View was requested, but there are no views specified for the endpoint at '#rd.file#'"
+				, err={ 
+						type="framework",
+						message= "View was requested, but there are no views specified for the endpoint at '#rd.file#'"
+					}
 				);
 			}
 
 			savecontent variable="the_page_content" {
 				//Get the type name
 				var ev = getType( rd.view );
-
 				//Custom message is needed here somewhere...
 				if ( ev.type != "string" && ev.type != "array" ) {
 					renderPage( 
