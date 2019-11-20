@@ -5,7 +5,7 @@ myst.cfc
 Author
 ------
 Antonio R. Collins II 
-(rc@tubularmodular.com, ramar.collins@gmail.com)
+(ramar@collinsdesign.net, ramar.collins@gmail.com)
 
 Copyright
 ---------
@@ -671,7 +671,7 @@ accessors=true
 	 *
 	 * Execute queries cleanly and easily.
 	 */
-	public function dbExec ( String datasource="#data.source#", String filename, String string, bindArgs ) {
+	public function dbExec ( String datasource="#data.source#", String filename, String string, bindArgs, Query query ) {
 		//Set some basic things
 		var Name = "query";
 		var SQLContents = "";
