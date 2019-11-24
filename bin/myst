@@ -651,17 +651,24 @@ then
 fi
 
 
-# List hosts
+# List hosts (notice that this will only list Myst instances) 
 if [ $DO_LIST -eq 1 ]
 then
 	cd $PREFIX
-	printf "Site                        | Enabled?\n"
-	printf "====                        | ========\n"
-	# Find all the links and test whether or not there is an enabled copy
-	find virt-hosts-available -type l | \
+	printf "%-40s Active?  Enabled?\n" "Site"
+	printf "%-40s =======  ========\n" "===="
+	find www/ -type f -name "myst.cfc" | \
+		grep -v "www/_" | \
+		xargs dirname | \
 		sort | \
 		xargs -IFF sh -c \
-			'printf "%-30s %s\n" $(basename FF) $(test -h ./virt-hosts-enabled/`basename FF` && echo Y )'
+			'printf "%-40s %-8s %-8s\n" \
+				$(basename FF) \
+				$(test -h ./virt-hosts-available/`basename FF` && echo @Y || echo @N ) \
+				$(test -h ./virt-hosts-enabled/`basename FF` && echo @Y || echo @N ) \
+			'
+	#	$(stat -c "%x" FF | awk "{ print $1 }") \
+	cd - >/dev/null
 fi
 
 
