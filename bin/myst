@@ -43,7 +43,7 @@ THIS_SITE=
 SRC=.
 DO_SES=0
 DO_GENVHOST=0
-usO_ACTIVATE=0
+DO_ACTIVATE=0
 DO_CREATE=0
 UPDATE=0
 NO_GIT=0
@@ -56,6 +56,7 @@ BACKUP_FILE=
 DO_FINALIZE=0
 DO_ENABLE=0
 DO_DISABLE=0
+DO_LIST=0
 
 
 # An error function
@@ -86,6 +87,7 @@ Instance options:
 -d, --description <arg>  Specify a description for the new instance.
 -s, --datasource <arg>   Specify a default datasource for use with the new instance.
     --finalize <arg>     Finalize a Myst instance.
+-l, --list               List all the hosts and their status.
 
 Modifiers and server-specific options:
 -i, --virtual-host <arg> Create a \$SERVER-style virtual host and an .htaccess file.
@@ -282,6 +284,11 @@ do
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
 			shift
 			DATASOURCE="$1"	
+		;;
+
+		# List 
+		-l|--list)	
+			DO_LIST=1
 		;;
 
 		# Verbose
@@ -599,10 +606,14 @@ then
 	fi
 
 	# This file ought to exist now, but something can still go wrong		
-	ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} || {
+	#echo ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} 
+	cd $PREFIX
+	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
+	ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME} || {
 		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
+	cd - >/dev/null
 fi
 
 
@@ -610,11 +621,21 @@ fi
 if [ $DO_ENABLE -eq 1 ]
 then
 	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
+
 	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" ${DOMAIN:-$NAME}
-	ln -s $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} $PREFIX/virt-hosts-enabled/ || {
-		printf "Failed to enable site: %s." ${DOMAIN:-$NAME}
+
+#	ln -s $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} $PREFIX/virt-hosts-enabled/ || {
+#		printf "Failed to enable site: %s." ${DOMAIN:-$NAME}
+#		exit 1	
+#	}
+
+	cd $PREFIX
+	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
+	ln -s virt-hosts-available/${DOMAIN:-$NAME} virt-hosts-enabled/${DOMAIN:-$NAME} || {
+		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
+	cd - >/dev/null
 fi
 
 
@@ -627,6 +648,20 @@ then
 		printf "Failed to disable site: %s." ${DOMAIN:-$NAME}
 		exit 1	
 	}
+fi
+
+
+# List hosts
+if [ $DO_LIST -eq 1 ]
+then
+	cd $PREFIX
+	printf "Site                        | Enabled?\n"
+	printf "====                        | ========\n"
+	# Find all the links and test whether or not there is an enabled copy
+	find virt-hosts-available -type l | \
+		sort | \
+		xargs -IFF sh -c \
+			'printf "%-30s %s\n" $(basename FF) $(test -h ./virt-hosts-enabled/`basename FF` && echo Y )'
 fi
 
 
