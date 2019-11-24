@@ -39,6 +39,7 @@ DO_MERGE=0
 DO_UPLOAD=0
 DO_CREATE=0
 DO_SETUP=0
+DO_LIST=0
 DO_COMPRESS=0
 #SRC= This will be filled out during the install process...
 SRCDIR=.
@@ -84,6 +85,7 @@ Post-install options:
     --setup              Run module setup routines.
 -o, --module <arg>       Load this module during setup if running setup by itself.
 
+-l, --list               List all of the available modules.
 -v, --verbose            Be verbose.
 -h, --help               Show this help and quit.
 USAGES
@@ -181,6 +183,11 @@ do
 		# Administration stuff
 		--setup)
 			DO_SETUP=1
+		;;
+
+		# List all of the available modules...
+		-l|--list)
+			DO_LIST=1
 		;;
 
 		# Administration stuff
@@ -304,10 +311,42 @@ fi
 # if FOLDER is needed, it ought to be a full path
 if [ ! -z "$FOLDER" ] 
 then
-
 	FOLDER=`realpath $FOLDER`
 	echo $FOLDER
+fi
 
+
+# Check the $CONF_FILE for either file:// or http://
+REPO_FETCH_CMD=
+REPO_LIST_CMD=
+source $CONF_FILE
+
+[ -z "$REPO_PATH" ] && err "No repository path specified in $CONF_FILE" 1
+
+if [[ ${REPO_PATH:0:7} == "http://" ]] || [[ ${REPO_PATH:0:8} == "https://" ]] 
+then
+	err "http[s] URIs are not supported yet."
+	MODPATH=$REPO_PATH
+	REPO_LIST_CMD=wget
+else
+	MODPATH=$REPO_PATH
+	REPO_LIST_CMD=
+fi
+
+# List the repos
+if [ $DO_LIST -eq 1 ] 
+then
+	if [ ! -d $MODPATH ]
+	then
+		err "$MODPATH does not seem to exist."
+	else
+		cd $MODPATH
+		find . -maxdepth 1 -type d 2>/dev/null | \
+			sort | \
+			sed 1d | \
+		xargs -IFF sh -c 'printf "%-20s - %s\n" "`basename FF`"'
+		cd -
+	fi
 fi
 
 

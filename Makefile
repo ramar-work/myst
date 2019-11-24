@@ -1,6 +1,6 @@
 # myst - Makefile last updated: 
 NAME=myst
-PREFIX=/opt/$(NAME)2
+PREFIX=/opt/$(NAME)
 LP=./tmp/myst
 SHAREDIR=$(PREFIX)/share
 MANDIR=${PREFIX}/share/man
@@ -118,6 +118,7 @@ build:
 		cd vendor/$(HTTPDV)/ && \
 			./configure \
 				--enable-static-support \
+				--enable-mpms-shared=all \
 				--with-apr=$$FULL_LP \
 				--with-apr-util=$$FULL_LP \
 				--prefix=$(PREFIX)/httpd && \

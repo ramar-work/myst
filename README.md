@@ -6,7 +6,7 @@ Summary
 
 Myst is a web framework for CFML based webservers such as ColdFusion and Lucee.
 The intent is to facilitate MVC-based web development for CFML applications,
-making it trivial to enforce "seperation of concerns" and create maintainable
+making it trivial to enforce seperation of concerns and create maintainable
 CFML codebases.
 
 
@@ -14,7 +14,7 @@ Installation
 ------------
 
 Myst can be downloaded via its <a href="http://mystframework.com">home page</a>
-or via Github at <a href="https://github.com/tubularmodular/myst">https://github.com/tubularmodular/myst</a>.  You can clone the latest version by using the following on your system:
+or via Github at <a href="https://github.com/zaiah-dj/myst">https://github.com/zaiah-dj/myst</a>.  You can clone the latest version by using the following on your system:
 
 1. If you are on Linux, go to your home directory and grab the latest copy.
 	<pre>
