@@ -609,7 +609,7 @@ then
 	#echo ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} 
 	cd $PREFIX
 	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
-	ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME} || {
+	ln -s ../www/${DOMAIN:-$NAME}/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME} || {
 		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
@@ -631,7 +631,7 @@ then
 
 	cd $PREFIX
 	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
-	ln -s virt-hosts-available/${DOMAIN:-$NAME} virt-hosts-enabled/${DOMAIN:-$NAME} || {
+	ln -s ../virt-hosts-available/${DOMAIN:-$NAME} virt-hosts-enabled/${DOMAIN:-$NAME} || {
 		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
