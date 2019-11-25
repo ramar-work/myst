@@ -293,11 +293,32 @@ do
 done
 
 
+# Check the $CONF_FILE for either file:// or http://
+REPO_FETCH_CMD=
+REPO_LIST_CMD=
+source $CONF_FILE
+test -z "$REPO_PATH" && err "No repository path specified in $CONF_FILE" 1
+
+# Check that it is a local f/s path for now.
+# TODO: Obviously, when Git and a web server are setup for repo hosting, change this.
+if [[ ${REPO_PATH:0:7} == "http://" ]] || [[ ${REPO_PATH:0:8} == "https://" ]] 
+then
+	err "http[s] URIs are not supported yet."
+	MODPATH=$REPO_PATH
+	REPO_LIST_CMD=wget
+else
+	MODPATH=$REPO_PATH
+	REPO_LIST_CMD=
+fi
+
+
+
 # choose between --install and --extract
 if [ $DO_INSTALL -eq 1 ] 
 then
 	FOLDER=$TOPATH
-	MODPATH=$FROMPATH	
+	test ! -z "$FROMPATH" && MODPATH=$FROMPATH
+	#echo $FOLDER $MODPATH
 fi
 
 
@@ -305,6 +326,7 @@ if [ $DO_EXTRACT -eq 1 ]
 then
 	FOLDER=$FROMPATH
 	MODPATH=$TOPATH	
+	#echo $FOLDER $MODPATH
 fi
 
 
@@ -316,22 +338,6 @@ then
 fi
 
 
-# Check the $CONF_FILE for either file:// or http://
-REPO_FETCH_CMD=
-REPO_LIST_CMD=
-source $CONF_FILE
-
-[ -z "$REPO_PATH" ] && err "No repository path specified in $CONF_FILE" 1
-
-if [[ ${REPO_PATH:0:7} == "http://" ]] || [[ ${REPO_PATH:0:8} == "https://" ]] 
-then
-	err "http[s] URIs are not supported yet."
-	MODPATH=$REPO_PATH
-	REPO_LIST_CMD=wget
-else
-	MODPATH=$REPO_PATH
-	REPO_LIST_CMD=
-fi
 
 # List the repos
 if [ $DO_LIST -eq 1 ] 
@@ -447,12 +453,15 @@ then
 
 	# Assume that this is from a disk 
 	else
-		printf "Copy from disk: $MODPATH\n"
-		stat $MODPATH 1>/dev/null 2>/dev/null || err "Module '$MODNAME' at $MODPATH not found..."
+		[ $VERBOSE -eq 1 ] && printf "Copy from disk: $MODPATH\n"
+
+		stat $MODPATH/$MODNAME >/dev/null 2>/dev/null || {
+			err "Module '$MODNAME' at $MODPATH not found..."
+		}
+
 		# Distinguish between files and stuff
-		cd $MODPATH
+		cd $MODPATH/$MODNAME
 		[ $VERBOSE -eq 1 ] && TARFLAGS="--verbose" || TARFLAGS=	
-		#[ $VERBOSE -eq 1 ] && echo git archive --format tar HEAD \| tar xf - -C $FOLDER/
 		git archive --format tar HEAD | tar xf - $TARFLAGS --exclude=.gitignore -C $FOLDER/
 		#tar cf - . | tar xf - --verbose -C $FOLDER/
 		cd -
