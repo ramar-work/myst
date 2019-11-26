@@ -57,6 +57,11 @@ err() {
 }
 
 
+# Return actual path from something
+modpath() {
+printf ''	
+}
+
 # A usage function
 usage() {
 	STATUS=${2:-0}
@@ -338,14 +343,24 @@ then
 fi
 
 
-
 # List the repos
 if [ $DO_LIST -eq 1 ] 
 then
-	if [ ! -d $MODPATH ]
+	#  
+	if [[ ${MODPATH:0:7} == "http://" ]] ||[[ ${MODPATH:0:8} == "https://" ]] 
 	then
 		err "$MODPATH does not seem to exist."
-	else
+	elif [[ ${MODPATH:0:6} == "dev://" ]]
+	then
+		[ ! -d ${MODPATH:6} ] && err "${MODPATH:6} does not seem to exist."
+		cd ${MODPATH:6}
+		find . -maxdepth 1 -type d 2>/dev/null | \
+			sort | \
+			sed 1d | \
+			xargs -IFF sh -c 'printf "%-20s - %s\n" "`basename FF`"'
+		cd -
+	else 
+		[ ! -d $MODPATH ] && err "$MODPATH does not seem to exist."
 		cd $MODPATH
 		find . -maxdepth 1 -type d 2>/dev/null | \
 			sort | \
@@ -450,6 +465,33 @@ then
 		printf "Pull from HTTP/HTTPS: $MODPATH\n"
 	# ghostbyname ${MODPATH%%...}  # Just pull the hostname and look
 		wget -O- $MODPATH | tar xzf - --verbose -C $FOLDER/
+
+	# Try setting dev endpoint for linking files from directory.
+	elif [[ ${MODPATH:0:6} == "dev://" ]]
+	then
+		MODPATH="${MODPATH:6}"
+		cd $MODPATH/$MODNAME >/dev/null
+
+		# Find each file in the top level and link it
+		find -maxdepth 2 -name "${MODNAME}.cfc" -o -name "${MODNAME}.cfm" | \
+			sed 's;./;;' | \
+			xargs -IFF sh -c "ln $MODPATH/$MODNAME/FF $FOLDER/FF"
+
+		# Create each directory if one does not exist...	
+		find . -maxdepth 3 -type d -name "${MODNAME}" | \
+			sed 's;./;;' | \
+			xargs -IFF sh -c "mkdir -p $FOLDER/FF"
+
+		# Then find each directory and link each of the files within each directory
+		# to a folder in the new thing	
+		find . -maxdepth 2 -type d -name "${MODNAME}" | \
+			sed 's;./;;' | \
+			xargs -IFF sh -c "
+				find FF -type f | xargs -ILL sh -c 'ln $MODPATH/$MODNAME/LL $FOLDER/LL'
+			"
+
+		# Change back to previous
+		cd - > /dev/null
 
 	# Assume that this is from a disk 
 	else
