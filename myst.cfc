@@ -135,7 +135,37 @@ accessors=true
 	property name="constantMap" type="struct"; 
 
 	//Relative path maps for framework directories
+	property name="routingKeys" type="string"
+		default="before,after,accepts,expects,returns,scope";
+		//default="before,after,accepts,expects,returns,scope,query";
+
+	//Relative path maps for framework directories
 	property name="urlBase" type="string" default="/"; 
+
+	/*New as of 11/27*/
+	//Allow methods to reference the current content-type
+	//NOTE: An enum would be safer here, but you'll just want to use a custom setter...
+	property name="selectedContentType" type="string" default="text/html"; 
+	property name="contentOn404" type="string" default="File not found."; 
+	property name="contentOn410" type="string" default="Authentication denied."; 
+	property name="contentOn500" type="string" default="Error occurred."; 
+	property name="selectedContentType" type="string" default="text/html"; 
+
+	//property name="logString" type="struct";
+	property name="logStyle" type="string" default="standard"; //combined, common,
+	property name="logType" type="string" default="file";
+	property name="logFile" type="string" default="log.txt";
+	property name="logFormatCommon" type="string" default="";
+	property name="logFormatCombined" type="string" default="";
+	property name="logFormat" type="string" default="log.txt";
+	property name="runId" type="string" default="";
+
+	//
+	property name="pageStatus" type="number" default=200;
+	property name="pageStatusMessage" type="string" default="";
+	property name="pageMessage" type="string" default="";
+	property name="pageError" default="";
+	property name="pageErrorExtractors" default="detail,message,type"; /*tagContext,stackTrace*/
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
@@ -238,23 +268,25 @@ accessors=true
 	 * logReport
 	 *
 	 * Will silently log as Myst executes
+	 * This is mostly for debugging.
 	 */
 	private function logReport ( Required String message ) {
-		/*
-		//Throw an error to get access to the exception 
-		line=0; file="";
-		try { 
-			callFin();
+		if ( getLogStyle() eq "standard" ) { 
+			//Do a verbose log
+			var id = getRunId();
+			var d = DateTimeFormat( Now(), "EEEE mmmm d, yyyy HH:NN:SS tt" );
+			var m = FileAppend( getLogFile(), "#id#: [#d# EST] #arguments.message#" & Chr(10) & Chr(13) );
+			//writedump(m); abort;
+		//'127.0.0.1 - - [#DateFormat()#] "#cgi.request_method# #cgi.path_info# HTTP/1.1" status content-size'
 		}
-		catch (any e) { 
-			template = e.TagContext[ 2 ].template; 
-			line = e.TagContext[ 2 ].line; 
+		else {
+			//Error out if this is a developement server.
+			0;
 		}
 
 		//Append the line number to whatever text is being written
-		this.logstring = ( StructKeyExists( this, "addLogLine") && this.addLogLine ) ? "<li>At line " & line & " in template '" & template & "': " & message & "</li>" : "<li>" & message & "</li>";
-		(StructKeyExists(this, "verboseLog") && this.verboseLog) ? writeoutput( this.logString ) : 0;
-		*/
+		//this.logstring = ( StructKeyExists( this, "addLogLine") && this.addLogLine ) ? "<li>At line " & line & " in template '" & template & "': " & message & "</li>" : "<li>" & message & "</li>";
+		//(StructKeyExists(this, "verboseLog") && this.verboseLog) ? writeoutput( this.logString ) : 0;
 	}
 
 
@@ -268,7 +300,7 @@ accessors=true
 	 * Generate links relative to the current application and its basedir if it
 	 * exists.
 	 */
-	public string function link ( ) {
+	public string function link () {
 		//Define spot for link text
 		var linkText = "";
 
@@ -281,9 +313,51 @@ accessors=true
 			linkText = linkText & "/" & ToString( arguments[ x ] );
 		}
 
+		//Figure out what to do...
+		if ( Len( linkText ) > 1 ) { 
+			var f = Find( "?", linkText );
+			if ( StructKeyExists( data, "autoSuffix" ) && Right( linkText, 4 ) != ".cfm" ) {
+				if ( f == 0 ) 
+					linkText &= ".cfm";
+				else {
+					var p = ListToArray( linkText, "?" );
+					linkText = "#p[1]#.cfm?#p[2]#";
+				}
+			}
+		}
 		return linkText;
 	}
 
+
+	/**
+	 * href( ... )
+	 *
+	 * Generate links relative to the current application and its basedir if it
+	 * exists.
+	 */
+/*
+	public string function href ( ) {
+		//Define spot for link text
+		var ltx = "";
+
+		//Base and stuff
+		if ( Len(data.base) > 1 || data.base neq "/" )
+			ltx = ( Right(data.base, 1) == "/" ) ? Left( data.base, Len(data.base) - 1 ) : data.base;
+
+		//Concatenate all arguments into some kind of hypertext ref
+		for ( var x in arguments )
+			ltx = ltx & "/" & ToString( arguments[ x ] );
+
+		//Check data.cfm for the autoSuffix key
+		if ( StructKeyExists( data, "autoSuffix" ) ) {
+			if ( Len( ltx ) > 1 && Right( ltx, 4 ) != ".cfm" ) {
+				ltx &= ".cfm";
+			}
+		}
+
+		return ltx;
+	}
+*/
 
 	/**
 	 * crumbs( ... )
@@ -435,6 +509,7 @@ accessors=true
 		//Define some variables important to this function
 		var match = false;
 		var ref;
+		logReport( "Running _include on path #where#/#name#" );
 
 		//Search for a valid path within our framework	
 		for ( var x in getArrayConstantMap() ) {
@@ -581,7 +656,7 @@ accessors=true
 	{
 		//TODO: This ought to be some kind of template...
 		if ( debuggable ) {
-			writedump( queryPath       );
+			writedump( queryPath );
 			writedump( queryDatasource );
 		}
 
@@ -852,6 +927,75 @@ accessors=true
 		return tr;
 	}
 
+	//Return pretty JSON with the correct casing from one place...
+	public String function queryToJSON ( Required Query arg ) {
+		var ar = ArrayNew(1);
+		for ( var v in arg ) ArrayAppend( ar, v );
+		return SerializeJSON( ar );
+	}
+
+	//Return pretty JSON with the correct casing from one place...
+	//NOTE: This is for one row
+	public String function structToJSON ( Required Struct arg ) {
+		function lowerStruct( Struct t ) {
+			var nnStruct = {};
+			for ( var v in t ) {
+				if ( getType( t[ v ] ).type eq "struct" )
+					nnStruct[ LCase(v) ] = lowerStruct( t[ v ] );
+				else {
+					nnStruct[ LCase(v) ] = t[ v ];
+				}
+			}
+			return nnStruct;
+		}
+
+		var nStruct = {};
+		for ( var v in arg ) {
+			if ( getType( arg[ v ] ).type eq "struct" )
+				nStruct[ LCase(v) ] = lowerStruct( arg[ v ] );
+			else {
+				nStruct[ LCase(v) ] = arg[ v ];	
+			}
+		}
+		//writedump( nStruct );	writeoutput( SerializeJSON( nStruct ) ); abort;
+		return SerializeJSON( nStruct );
+	}
+
+	/*
+	public String function TESTstructToJSON ( Struct arg ) {
+		//Single-level
+		var x = { butter = "is tasty", guns = "are not" };	
+		writedump( getMyst().structToJSON( x ) ); abort;
+
+		//Try w/ bi-level struct	
+		var y = { butter = "is tasty", guns = "are not", icon = { bop = "wop" } };	
+		writedump( getMyst().structToJSON( y ) ); abort;
+
+		//Try w/ 3+-level struct	
+		var z = { 
+			butter = "is tasty"
+		, guns = "are not" 
+		, icons = {
+				instagram = "are not" 
+			,	facebook = "are not" 
+			,	array = [ "asdf", "back", 0, 1 ]
+			,	struct = {
+					first_name = "John"
+				,	last_name = "Salley"
+				} 
+			}
+		};	
+		writedump( getMyst().structToJSON( z ) ); abort;
+	}
+	*/
+
+	public String function queryToXML ( Query arg ) {
+
+	}
+
+	public String function structToXML ( Struct arg ) {
+
+	}
 
 	/** RESPONSE **
  * --------------------------------------------------------------------- */
@@ -875,10 +1019,11 @@ accessors=true
 	private function sendResponse ( Required status, Required mime, Required content, Struct headers, Boolean abort ) {
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
+		//TODO: Why is this not setting the status message...
+		//w.flush(); //this is a function... thing needs to shut de fuk up
 		r.setStatus( arguments.status, getHttpHeaders()[ arguments.status ] );
-		r.setContentType( "text/html" );
+		r.setContentType( arguments.mime );
 		w.print( arguments.content );
-		//r.flush(); //this is a function... thing needs to shut de fuk up
 		if ( !StructKeyExists( arguments, "abort" ) || arguments.abort eq true ) {
 		 abort;
 		}
@@ -891,7 +1036,7 @@ accessors=true
 	 * Send a 200 along with whatever was asked for.
 	 */
 	private function contentHandler ( Required String mime, Required content ) {
-		sendResponse( status=200, mime="text/html", content=arguments.content );
+		sendResponse( status=200, mime=arguments.mime, content=arguments.content );
 	} 
 	
 	
@@ -936,12 +1081,6 @@ accessors=true
 			errorContent = "A '#errors.type#' error has occurred.";
 		}
 
-		//Packaging the full custom error will have happened in the above steps
-		if ( 0 ) {
-			writedump( errors ); 
-			abort;
-		}
-
 		//Page errors are somewhat simple to do, an "error" object that
 		//can be cast to string isn't as obvious, but will come in handy
 		//especially depending on special content types (xml, json, msgpack, etc)
@@ -960,11 +1099,11 @@ accessors=true
 		//we can have a custom page, where a user defined error can be loaded
 		//and obviously other formats (JSON, XML) should be easily returnable
 		savecontent variable="finalContent" {
-			if ( 0 )
+			if ( getSelectedContentType() eq "application/json" )
 				; 
-			else if ( 0 )
+			else if ( getSelectedContentType() eq "text/xml" )
 				;
-			else if ( 0 ) 
+			else if ( getSelectedContentType() eq "text/plain" )
 				;
 			else {
 				//This is the default for now...
@@ -979,61 +1118,113 @@ accessors=true
 		//sendResponse( status=500, mime="text/html", content=finalContent );
 
 		//Send the request (which should be via another function)
-		sendResponse( status=500, mime="text/html", content=finalContent );
+		sendResponse( status=500, 
+			mime=getSelectedContentType(), 
+			content=finalContent 
+		);
 	}
 
 
 	/**
 	 * renderPage
 	 *
-	 * Hash function for text strings
+	 * Generates a page to send to stdout
 	 */
 	private function renderPage( Required Numeric status, Required content, Struct err, Boolean abort ) {
-		var err = {};
+		var errStruct = {};
 		var a = arguments;
 		var b = false;
-		var page;
-
-		//TODO: Why would this happen?
-		if ( isDefined( "appdata" ) )
-			b = check_deep_key( appdata, "routes", getRname(), "content-type" );
-
-		//Define page from here...
-		page = "std/" & ( b ? "mime" : "html" ) & "-view.cfm";
-
-		//Write out arguments here.  Serves as a stack trace to find things.
-		//writedump( arguments ); abort;
-
-		//This can be content-less
-		if ( !arguments.status || arguments.status == 200 )
-			contentHandler( mime="text/html", content=arguments.content ); 	
-
-		//How would a default resource not be found...	?
-		else if ( arguments.status > 399 && arguments.status < 500 )
-			contentHandler( mime="text/html", content="fnf" ); 	
-
-		//Server errors
-		else if ( arguments.status > 499 && !StructIsEmpty( arguments.err ) )
-			errorHandler( 
-				mime="text/html", 
-				status=arguments.status, 
-				content='something awful', 
-				errors=arguments.err 
-			);
-		
-		else {
-			//we should never get here, but handle it anyway
-			errorHandler( 
-				mime="text/html", 
-				status=500,
-				content="renderPage caller error...",
-				errors=arguments.err,
-				extraContent=[
-					"Check the 'status' key supplied to the method and " & 
-					"ensure that a valid HTTP Status is used." 
-				]
-			);
+		var h = getHttpHeaders();
+	
+		//TODO: Why is this here?
+		if ( !arguments.status || arguments.status == 200 ) {
+			//contentHandler( mime=getSelectedContentType(), content=arguments.content );
+			sendResponse( 200, getSelectedContentType(), arguments.content );
 		}
+
+		//If an error struct is given and it has something in it, do...
+		if ( !StructKeyExists( arguments, "err" ) || StructIsEmpty( arguments.err ) ) {
+			setPageStatus( arguments.status );
+			setPageStatusMessage( getHttpHeaders()[arguments.status] );
+			if ( getPageStatus() eq 401 )
+				setPageMessage( "The client asked for access to a page it does not have access to." );
+			else if ( getPageStatus() eq 404 )
+				setPageMessage( "The client made a request for " &
+					"<u>#cgi.script_name# and it was not found on this server." );
+			else {
+				setPageMessage( "Unspecified error occurred." );
+			}
+		}
+		else {
+			//What if it's a 200?
+			setPageError( arguments.err );
+			if ( arguments.status > 499 ) {
+				setPageStatus( arguments.status );
+				setPageStatusMessage( getHttpHeaders()[arguments.status] );
+				//Handle errors of different exception types
+				if ( !StructKeyExists( arguments.err, "type" ) )
+					setPageMessage( "An undefined error has occurred." );
+				else if ( err.type eq "Application" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Database" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Template" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Object" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Expression" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Security" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Lock" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "Any" )
+					setPageMessage( "An '#err.type#' error has occurred." );
+				else if ( err.type eq "MissingInclude" ) {
+					setPageMessage( "An '#err.type#' error has occurred. " &
+					"#err.MissingFileName# was not found in the application structure" );
+				}
+				else {
+					setPageMessage( "A '#err.type#' error has occurred." );
+				}
+			} 
+		}
+
+		//...
+		var c = getSelectedContentType();
+		if ( c == "application/json" || c == "json" ) {
+			var e = {};
+			for ( var k in getPageErrorExtractors() ) e[ k ] = err[ k ];
+			sendResponse( arguments.status, getSelectedContentType(), structToJSON( e ) ); 
+		}
+		else if ( c == "text/plain" ) {
+			abort;
+		}
+		else if ( c == "text/xml" || c == "xml" ) {
+			sendResponse( 500, getSelectedContentType(), "Myst does not support text/xml mimetype returns yet." );
+			abort;
+		}
+		else if ( c == "text/html" ) {
+			var f = ( arguments.status > 399 && arguments.status < 500 ) ? 4 : 5;
+			//_include the chosen view page
+			var a; 
+			savecontent variable="content" {
+				a = _include( where="std", name="#f#xx-view" );
+			}
+
+			if ( !a.status ) {
+writedump( a ); abort;
+				setPageMessage( a.message );
+				sendResponse( 500, getSelectedContentType(), a.message );
+			}
+			//contentHandler( mime=getSelectedContentType(), content=content ); 	
+			sendResponse( arguments.status, getSelectedContentType(), arguments.content );
+		}
+		else {
+			//You might need a default handler or a custom handler for certain types... 
+		}
+
+		//If err is present and not empty, then this is an error and is streamed and handled by me
 
 		//Jump and die
 		if ( StructKeyExists( arguments, "abort" ) && arguments.abort eq true )
@@ -1050,24 +1241,25 @@ accessors=true
 	 * Send a struct back wrapped as a JSON object.
 	 */
 	public string function sendAsJson ( ) {
-		var a = {};
-		var pc;
-
-		if ( !StructCount( arguments ) ) 
-			;
-		else if ( StructCount( arguments ) eq 1 ) {
-			//serialize
-			a = SerializeJSON( arguments );
-		}
+		var a = structToJSON( arguments );
+		if ( !getApiAutodie() )
+			writeoutput( a );
 		else {
-			//serialize and start adding everything else
-			for ( var k in arguments ) {
-				a[ k ] = arguments[ k ];
-			}	
+			pc = getpagecontext().getResponse();
+			pc.setContentType( "application/json" );
+			writeoutput( a );
+			abort;
 		}
+		return a;
+	}
 
-		//TODO: Use contentHandler(...) to send back with application/json	
-		a = SerializeJSON( a );
+	/**
+	 * sendAsJson (t)
+	 *
+	 * Send a query back wrapped as a JSON object.
+	 */
+	public string function sendQueryAsJson ( Query q ) {
+		var a = queryToJSON( q );
 		if ( !getApiAutodie() )
 			writeoutput( a );
 		else {
@@ -1080,131 +1272,23 @@ accessors=true
 	}
 
 
-	/**
-	 * makeIndex( Myst mystInstance )
-	 *
-	 * Generate a page through the page generation cycle.
-	 */
-	public function makeIndex (Myst MystInstance) {
-		//Define some local things
-		var oScope;
-		var nScope;
-		var resName;
+	private function evalBefore( Required Struct r ) {
 
-		//TODO: Change these from global scope when full object conversion happens.
-		variables.coldmvc = MystInstance;
-		variables.myst    = MystInstance;
-		variables.data    = MystInstance.app;
-		//variables.db      = MystInstance.app.data;
+	}
 
-		//Load all the components should have been loaded...
-		try {
-			logReport( "Load components" );
+	private function evalAfter( Required Struct r ) {
 
-			//Go through all the components in the components directory
-			var dir = "components";
-			var dirQuery = DirectoryList( "components", false, "query", "*.cfc" );
-			/*
-			for ( var q in dirQuery ) {
-				if ( q.name neq "Application.cfc" ) {
-					var vv = Replace( q.name, ".cfc", "" );
-					var m = MystInstance;
-					variables[ vv ] = createObject( "component", "components.#vv#" ).init( m );
-				}
-			}
-			*/
-			//Choose a datasource for each of our modules to use here.
-			var dds = "";
-			if ( StructKeyExists( data, "source" ) )
-				dds = data.source;
-			else if ( StructKeyExists( application, "datasource" ) )
-				dds = application.datasource;
-			else if ( StructKeyExists( application, "defaultdatasource" ) ) {
-				dds = application.defaultdatasource;
-			}
+	}
 
-			//Initialize each component with common properties
-			for ( var q in dirQuery ) {
-				if ( q.name neq "Application.cfc" && q.name neq "base.cfc" ) {
-					var vv = Replace( q.name, ".cfc", "" );
-					var m = MystInstance;
-					//variables[ vv ] = createObject( "component", "components.#vv#" ).init( m );
-					var cname = Replace( q.name, ".cfc", "" );
-					//variables[ vv ] = createObject( "component", "components.#vv#" ).init(
-					var cmp 
-					= variables[ vv ]
-					= g[cname] 
-					= createObject( "component", "components.#vv#" ).init(
-							mystObject = m 
-						, realname = cname
-						, namespace = cname
-						, datasource = dds
-						, debuggable = 0
-						, verbose = 0
-					);
-				}
-			}
-		}
-		catch (any e) {
-			renderPage( status=500, content="Component load failed.", err=e );
-		}
-		
-		//Route injection should happen here.
-		try {
-			//Add more to logging
-			logReport("Evaluating routes.");
-			var dirQuery = DirectoryList( "routes", false, "query", "*.cfm" );
-			var callstat = 0;
-			for ( var q in dirQuery ) {
-				var n = Replace( q.name, ".cfm", "" );
-				callstat = _include( where = "routes", name = n );
-				if ( !callstat.status ) {
-					renderPage( 
-						status=500
-					, err=callstat.errors
-					, content="Syntax error at routes/#n#"
-					);
-				}
-			}
-		}
-		catch (any e) {
-			renderPage( status=500, content="Route injection failed.", err=e );
-		}
-
-		//Find the right resource.
-		try {
-			//Add more to logging
-			logReport("Evaluating URL route");
-
-			//TODO: All aliasing needs to be handled here.	
-			var ses_path = (check_deep_key( appdata, "settings", "ses" )) 
-				? cgi.path_info : cgi.script_name;
-
-			//Set some short names in case we need to access the page name for routing purposes
-			var rd = findResource( name=cgi.script_name, rl=appdata );
-			setRname( rd.file /*resourceIndex( name=cgi.script_name, rl=appdata )*/ );
-			variables.data.loaded = variables.data.page = resName = getRname();
-
-			//Send a 404 page and be done if this resource was not specified in data.cfm
-			if ( rd.status eq 404 ) {
-				renderPage( status=404, content="Resource not found.", err={} ); 
-			}
-	
-			logReport( "Success" );
-		}
-		catch (any e) {
-			renderPage( status=500, content="Locating resource mapping failed.", err=e );
-		}
-
-
+	private function evalModel( Required Struct rd ) {
 		//Evaluate model 
 		try {
 			//Get the original scope before running anything
-			oScope = ListSort( StructKeyList( variables ), "textNoCase" );
+			//var oScope = ListSort( StructKeyList( variables ), "textNoCase" );
 
 			//Log what's happening	
-			logReport( "Evaluating models..." );
-	
+			logReport( "Evaluating models @ /#data.page#..." );
+//renderPage( 401, "Some content." ); abort;
 			//Model
 			if ( StructKeyExists( rd, "model" ) ) {
 				//Check the type's value 
@@ -1227,7 +1311,6 @@ accessors=true
 					}
 				}
 				else {
-
 					for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
 						var ee = ev.value[ ind ]; 
 						var ey = getType( ee );	
@@ -1262,7 +1345,7 @@ accessors=true
 						if ( !callStat.status ) {
 							renderPage( 
 								status=500
-							, content="Error executing model file #page.value#"
+							, content="Error executing model file '#page.value#'"
 							, err=callStat.errors 
 							);
 						}
@@ -1275,6 +1358,7 @@ accessors=true
 							page.value( );
 						}
 						catch (any e) {
+writedump(e); abort;
 							renderPage( 
 								status=500
 							, content="Error executing model closure at #rd.file#"
@@ -1287,15 +1371,18 @@ accessors=true
 		}
 		catch (any e) {
 			//Manually wrap the error template here.
-			renderPage(status=500, err=e, content = "Error executing models at: '#rd.file#'" );
+			renderPage(status=500, err=e, content="Error executing models at: '#rd.file#'" );
 		}
+	}
 
 
-		//This is supposed to help me trim scopes...
-		nScope = ListSort( structKeyList( variables ), "textNoCase" );
-		lScope = ListToArray( ListSort( ReplaceList( nScope, oScope,
-			REReplace( oScope, "[a-zA-Z0-9_]", "", "all" ) ), "textNoCase", "asc", ",") ); 
 
+	/**
+	 * private String function evalView ( Required struct rd )
+	 *
+	 * Evaluates a view.
+	 */
+	private String function evalView( Required Struct rd ) {
 		//Evaluate view
 		try {
 			logReport( "Evaluating views..." );
@@ -1310,6 +1397,7 @@ accessors=true
 				);
 			}
 
+			var the_page_content;
 			savecontent variable="the_page_content" {
 				//Get the type name
 				var ev = getType( rd.view );
@@ -1343,6 +1431,270 @@ accessors=true
 			renderPage( status=500, err=e, content="Error in parsing view." );
 		}
 
+		return the_page_content;
+	}
+
+	/**
+	 * makeIndex( Myst mystInstance )
+	 *
+	 * Generate a page through the page generation cycle.
+	 */
+	public function makeIndex (Myst MystInstance) {
+		//Define some local things
+		//var oScope;
+		//var nScope;
+		//var resName;
+
+		//TODO: Change these from global scope when full object conversion happens.
+		variables.coldmvc = MystInstance;
+		variables.myst = MystInstance;
+		variables.data = MystInstance.app;
+		//variables.db = MystInstance.app.data;
+
+		//Load all the components should have been loaded...
+		try {
+			//Go through all the components in the components directory
+			logReport( "Loading components..." );
+			var dir = "components";
+			var dirQuery = DirectoryList( "components", false, "query", "*.cfc" );
+
+			//Choose a datasource for each of our modules to use here.
+			var dds = "";
+			if ( StructKeyExists( data, "source" ) )
+				dds = data.source;
+			else if ( StructKeyExists( application, "datasource" ) )
+				dds = application.datasource;
+			else if ( StructKeyExists( application, "defaultdatasource" ) ) {
+				dds = application.defaultdatasource;
+			}
+
+			//Initialize each component with common properties
+			for ( var q in dirQuery ) {
+				logReport( "Loading component '#q.name#'..." );
+				if ( q.name neq "Application.cfc" && q.name neq "base.cfc" ) {
+					var vv = Replace( q.name, ".cfc", "" );
+					var m = MystInstance;
+					var cname = Replace( q.name, ".cfc", "" );
+					var cmp 
+					= variables[ vv ]
+					= g[cname] 
+					= createObject( "component", "components.#vv#" ).init(
+							mystObject = m 
+						, realname = cname
+						, namespace = cname
+						, datasource = dds
+						, debuggable = 0
+						, verbose = 0
+					);
+				}
+				logReport("SUCCESS!");
+			}
+			logReport("SUCCESS - All components loaded!");
+		}
+		catch (any e) {
+			renderPage( status=500, content="Component load failed.", err=e );
+		}
+		
+		//Route injection should happen here.
+		try {
+			//Add more to logging
+			logReport("Evaluating routes...");
+			var dirQuery = DirectoryList( "routes", false, "query", "*.cfm" );
+			var callstat = 0;
+			for ( var q in dirQuery ) {
+				var n = Replace( q.name, ".cfm", "" );
+				callstat = _include( where = "routes", name = n );
+				if ( !callstat.status ) {
+					renderPage( 
+						status=500
+					, err=callstat.errors
+					, content="Syntax error at routes/#n#"
+					);
+				}
+			}
+			logReport("SUCCESS - All routes loaded!");
+		}
+		catch (any e) {
+			renderPage( status=500, content="Route injection failed.", err=e );
+		}
+
+		//Build "full" routing table by adding inherited keys and whatnot...
+		try {
+			logReport("Re-building routing table...");
+			function passLevelDown( Required Struct arg, Struct found ) {
+				//If found is not blank, loop through each of those and add them...
+				if ( !StructIsEmpty( found ) ) {
+					for ( var f in found ) arg[ f ] = found[ f ];
+				}
+
+				//Check the struct for any keys, apply them to whatever struct
+				var nStruct = {};
+				for ( var k in ListToArray( getRoutingKeys() ) ) {
+					if ( StructKeyExists( arg, k ) ) nStruct[ k ] = arg[ k ];
+				}
+
+				//Finally, loop through...gin.cfm
+				for ( var vv in arg ) {
+					if ( ArrayContains( ListToArray( getRoutingKeys() ), vv ) ) {
+						continue;
+						//writeoutput( "Skip key '#vv#' at ...<br />"  );
+					}
+
+					if ( getType( arg[ vv ] ).type eq 'struct' ) {
+						passLevelDown( arg[ vv ], nStruct );
+					}
+				}
+			}
+
+			//Use recursion and find each key in each part
+			passLevelDown( appdata.routes, {} );
+			logReport("SUCCESS!");
+		}
+		catch (any e) {
+			renderPage( status=500, content="Error rebuilding route index.", err=e );
+		}
+
+		//Find the right resource.
+		try {
+			//Add more to logging
+			logReport( "Evaluating URL route..." );
+
+			//TODO: All aliasing needs to be handled here.	
+			var ses_path = (check_deep_key( appdata, "settings", "ses" )) 
+				? cgi.path_info : cgi.script_name;
+
+			//Set some short names in case we need to access the page name for routing purposes
+			var rd = findResource( name=cgi.script_name, rl=appdata );
+			setRname( rd.file /*resourceIndex( name=cgi.script_name, rl=appdata )*/ );
+			variables.data.loaded = variables.data.page = resName = getRname();
+
+			//Send a 404 page and be done if this resource was not specified in data.cfm
+			if ( rd.status eq 404 ) {
+				renderPage( status=404, content="Resource not found.", err={} ); 
+			}
+			logReport( "SUCCESS!" );
+		}
+		catch (any e) {
+			renderPage( status=500, content="Locating resource mapping failed.", err=e );
+		}
+
+		//With this new system in place, some things have higher precedence...
+		//'before' is always first
+		//'accepts', 'expects', and possibly 'scope' really should be run...
+		//'query' should come before model (if implemented)
+		//'model' ought to be next
+		//'returns' does little good right now..., models can be done..., I suppose
+		//'view(s)' next
+		//'after' should always be final 
+
+		//The scope should carry things over...
+		var scope = {};  
+		if ( StructKeyExists( rd, "scope" ) ) {
+			logReport( "Evaluating key 'scope' @ /#data.page#..." );
+			scope = rd.scope;	
+			logReport( "SUCCESS!" );
+		}
+
+		if ( StructKeyExists( rd, "returns" ) ) {
+			logReport( "Evaluating key 'returns' @ /#data.page#..." );
+			if ( getType( rd.returns ).type neq "string" ) {
+				//sendResponse( );	
+				//contentHandler( );	
+				//errorHandler( );	
+				//renderPage( );	
+			}	
+			setSelectedContentType( rd.returns );	
+			logReport( "SUCCESS!" );
+		}
+
+		//Run something before every request to this endpoint
+		if ( StructKeyExists( rd, "before" ) ) {
+			logReport( "Evaluating key 'returns' @ /#data.page#..." );
+			//Get the type of rd.before
+			var t = getType( rd.before );
+
+			if ( t.type eq "closure" )
+				rd.before( scope );	
+			else if ( t.type eq "struct" ) {
+				//Could evaluate model and view here as default
+			} 
+			else {
+				//Throw an error because right now, no other types are supported.
+			}
+			//writedump( t );
+			logReport( "SUCCESS!" );
+		}
+
+		//Checks the actual method
+		if ( StructKeyExists( rd, "accepts" ) ) {
+			logReport( "Evaluating key 'accepts' @ /#data.page#..." );
+			rd.accepts = ListToArray( rd.accepts );
+			//If the method is NOT a member of rd.accepts, die...
+			logReport( "SUCCESS!" );
+		}
+
+		//Checks the values within a particular scope 
+		if ( StructKeyExists( rd, "expects" ) ) {
+			logReport( "Evaluating key 'expects' @ /#data.page#..." );
+			rd.expects = ListToArray( rd.expects );
+			//Build a list of scopes from the above (if thrown)
+			//Otherwise, we ought to assume that the variables could be anywhere 
+			//var s = { GET=url, POST=form };
+			/*
+			for ( var k in rd.expects ) {
+				if ( StructIsEmpty( k ) ) {
+					//Return HTML or some other interchange format
+					//errorHandler( ... ); 
+				}	
+			}
+			*/
+			logReport( "SUCCESS!" );
+		}
+
+		//Query SHOULD be higher precedence than model
+		if ( StructKeyExists( rd, "query" ) ) {
+			logReport( "Evaluating key 'query' @ /#data.page#..." );
+			//rd.query = "";
+			logReport( "SUCCESS!" );
+		}
+
+		//This is where rethinking things could help, scope should be another argument.
+		if ( StructKeyExists( rd, "model" ) ) {
+			//The status should return here, and errors handled
+			evalModel( rd );	
+		}
+
+		var the_page_content;
+		if ( StructKeyExists( rd, "view" ) ) {
+			logReport( "Evaluating views @ /#data.page#..." );
+			the_page_content = evalView( rd );
+		}
+
+		if ( StructKeyExists( rd, "after" ) ) {
+			logReport( "Evaluating key 'after' @ /#data.page#..." );
+			//Get the type of rd.after
+			var t = getType( rd.after );
+
+			if ( t.type eq "closure" )
+				rd.after( scope );	
+			else if ( t.type eq "struct" ) {
+				//Could evaluate model and view here as default
+			} 
+			else {
+				//Throw an error because right now, no other types are supported.
+			}
+			//writedump( t );
+			logReport( "SUCCESS!" );
+		}
+
+		//writedump( rd ); abort;	
+
+		/*
+		//This is supposed to help me trim scopes...
+		nScope = ListSort( structKeyList( variables ), "textNoCase" );
+		lScope = ListToArray( ListSort( ReplaceList( nScope, oScope,
+			REReplace( oScope, "[a-zA-Z0-9_]", "", "all" ) ), "textNoCase", "asc", ",") ); 
+		*/
 
 		// Evaluate any post functions (not sure what these would be yet)
 		if ( !StructKeyExists( appdata, "post" ) ) 
@@ -1991,9 +2343,7 @@ accessors=true
 	public Myst function init (Struct appscope) {
 		//Define things
 		var appdata;
-		var rootDir;
-		var currentDir;
-		var constantMap;
+		//this.href = this.link;
 	
 		//Initialize common elements 
 		//TODO: (these should be done once, and I have yet to figure out a clean
@@ -2003,25 +2353,27 @@ accessors=true
 		setMimeToFileMap( createObject( "component", "std.components.mimes" ).init() );
 		setFileToMimeMap( createObject( "component", "std.components.files" ).init() );
 
+		//Invoke an id to track what happens during hte session
+		setRunId( randstr(32) );
+
 		//....
-		rootDir = getDirectoryFromPath(getCurrentTemplatePath());
-		currentDir = getDirectoryFromPath(getCurrentTemplatePath());
-		constantMap = {}; 
-		setRootDir( rootDir );
-		setCurrentDir( currentDir );
+		//var rootDir = getDirectoryFromPath(getCurrentTemplatePath());
+		//var currentDir = getDirectoryFromPath(getCurrentTemplatePath());
+		var constantMap = {}; 
+		setRootDir( getDirectoryFromPath(getCurrentTemplatePath()) );
+		setCurrentDir( getDirectoryFromPath(getCurrentTemplatePath()) );
 		setArrayConstantMap( [ "app", "assets", "db", "files", "routes", "sql", "std", "views" ] );
 		setPathSep( ( server.os.name eq "Windows" ) ? "\" : "/" );
-		for ( var k in getArrayConstantMap() ) constantMap[ k ] = rootDir & k;
+		for ( var k in getArrayConstantMap() ) constantMap[ k ] = getRootDir() & k;
 		setConstantMap( constantMap );
 
 		//Add pre and post
-		if (StructKeyExists(appscope, "post"))
+		if ( StructKeyExists(appscope, "post") )
 			setPostMap( appscope.post );
-		if (StructKeyExists(appscope, "pre"))
+		if ( StructKeyExists(appscope, "pre") )
 			setPreMap( appscope.pre );
-		if (StructKeyExists(appscope, "objects")) {
+		if ( StructKeyExists(appscope, "objects") ) {
 			var obj = getObjects();
-			//setObjects({ });
 			for ( var x in appscope.objects ) {
 				StructInsert( obj, x, appscope.objects[x] );
 			}
@@ -2038,9 +2390,10 @@ accessors=true
 			//All of the properties in data.cfm (or data.cfc) should
 			//show up here...
 			setUrlBase( appdata.base );
-			logReport( "Success" );
+			logReport( "Success!" );
 		}
 		catch (any e) {
+			logReport( "Failure!" );
 			renderPage( status=500, content="Deserializing data.cfm failed", err=e );
 			abort;
 		}
