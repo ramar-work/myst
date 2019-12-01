@@ -1481,7 +1481,7 @@ accessors=true
 		catch (any e) {
 			renderPage( status=500, content="Component load failed.", err=e );
 		}
-		
+
 		//Route injection should happen here.
 		try {
 			//Add more to logging
@@ -1634,9 +1634,9 @@ accessors=true
 			//If kFind has anything false, we die here
 			for ( var f in kFind ) {
 				if ( !kFind[ f ].found ) {
-					writeoutput( "<h2>This endpoint expected variables it did not receive.</h2>" );
-					abort;
-					renderPage( status=412, content="This endpoint expected variables it did not receive." );
+					var content = "This endpoint expected variables it did not receive.";
+					//TODO: If no err and status is greater than 399, type is 'custom', detail, I dunno...
+					renderPage( status=412, content=content, err={ message=content,detail="",type="" } );
 				}
 			}
 			logReport( "SUCCESS!" );
