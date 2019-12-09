@@ -83,6 +83,10 @@ TODO
 
 - maybe add a way to enable tags? ( a tags folder )
 
+CHANGELOG
+---------
+- 2019/12/09: Added query checks to getType
+
  * -------------------------------------------------- */
 component 
 name="Myst" 
@@ -166,6 +170,7 @@ accessors=true
 	property name="pageMessage" type="string" default="";
 	property name="pageError" default="";
 	property name="pageErrorExtractors" default="detail,message,type"; /*tagContext,stackTrace*/
+	property name="components" type="struct";
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
@@ -274,6 +279,7 @@ accessors=true
 	 * This is mostly for debugging.
 	 */
 	private function logReport ( Required String message ) {
+		try {
 		if ( getLogStyle() eq "standard" ) { 
 			//Do a verbose log
 			var id = getRunId();
@@ -290,6 +296,13 @@ accessors=true
 		//Append the line number to whatever text is being written
 		//this.logstring = ( StructKeyExists( this, "addLogLine") && this.addLogLine ) ? "<li>At line " & line & " in template '" & template & "': " & message & "</li>" : "<li>" & message & "</li>";
 		//(StructKeyExists(this, "verboseLog") && this.verboseLog) ? writeoutput( this.logString ) : 0;
+		}
+		catch (any e) {
+			//TODO: Obviously, this should pretty much always run
+			//Simply catching and throwing an error isn't a good solution...
+			writedump(e);
+			abort;
+		}
 	}
 
 
@@ -333,36 +346,6 @@ accessors=true
 
 
 	/**
-	 * href( ... )
-	 *
-	 * Generate links relative to the current application and its basedir if it
-	 * exists.
-	 */
-/*
-	public string function href ( ) {
-		//Define spot for link text
-		var ltx = "";
-
-		//Base and stuff
-		if ( Len(data.base) > 1 || data.base neq "/" )
-			ltx = ( Right(data.base, 1) == "/" ) ? Left( data.base, Len(data.base) - 1 ) : data.base;
-
-		//Concatenate all arguments into some kind of hypertext ref
-		for ( var x in arguments )
-			ltx = ltx & "/" & ToString( arguments[ x ] );
-
-		//Check data.cfm for the autoSuffix key
-		if ( StructKeyExists( data, "autoSuffix" ) ) {
-			if ( Len( ltx ) > 1 && Right( ltx, 4 ) != ".cfm" ) {
-				ltx &= ".cfm";
-			}
-		}
-
-		return ltx;
-	}
-*/
-
-	/**
 	 * crumbs( ... )
 	 *
 	 * Create "breadcrumb" link for really deep pages within a webapp. 
@@ -378,6 +361,19 @@ accessors=true
 		}
 	}
 
+
+	/**
+	 * import( ... )
+	 *
+	 * Import components.
+	 */
+	public function import ( Required String cfc ) {
+		if ( !StructKeyExists( variables, cfc ) )
+			return null;
+		else {
+			return variables[ cfc ];
+		}
+	}
 
 
 	/** FORMS **
@@ -462,8 +458,8 @@ accessors=true
 	/** 
 	 * getType
 	 *
-	 * ...
-	 *
+	 * Get the type of a value.
+	 * 
 	 */
 	public Struct function getType ( Required sCheck ) {
 		//Get the type name
@@ -484,17 +480,24 @@ accessors=true
 			}
 		}
 		catch (any e) {
+			typename = "unknown";
 			//the non-basic types (query, closure, etc) are handled here
-			typename = "unknown type";
 			try {
-				if ( StructKeyExists( t, "access" ) ) {
-					typename = "closure";
+				if ( IsStruct( t ) && StructKeyExists( t, "access" ) )
 					return { status=true, type="closure", value=sCheck }; 
+				else if ( IsArray( t ) ) {
+					for ( var k in [ "isCaseSensitive","name","typeName" ] ) {
+						if ( !StructKeyExists( t[1], k ) ) {
+							return { status=false, type=typename, value={} }; 
+						}
+					}
+					//TODO: Will 'sCheck' be copied?  b/c this is pretty slow...
+					return { status=true, type="query", value=sCheck }; 
 				}
 			}
 			catch (any de) {
 				//This should catch either truly unknown or badly wrapped types (like queries)
-				return { status=false, type="unknown", value={} };
+				return { status=false, type=typename, value={} };
 			}
 		}
 
@@ -1244,7 +1247,7 @@ accessors=true
 		else if ( t.type eq "struct" ) {
 			//Could evaluate model and view here as default
 			if ( StructKeyExists( rd, "model" ) ) {
-				evalModel( rd );
+				evalModel( rd.model );
 			}
 			if ( StructKeyExists( rd, "view" ) ) {
 				evalView( rd );
@@ -1267,98 +1270,96 @@ accessors=true
 		return null;  //This should return some kind of type
 	}
 
-	//
-	private function evalModel( Required Struct rd ) {
-		//Evaluate model 
+
+	//...
+	private function evalModel( Required rd ) {
+		logReport( "Evaluating models @ /#data.page#..." );
 		try {
-			//Get the original scope before running anything
-			//var oScope = ListSort( StructKeyList( variables ), "textNoCase" );
-
-			//Log what's happening	
-			logReport( "Evaluating models @ /#data.page#..." );
-//renderPage( 401, "Some content." ); abort;
-			//Model
-			if ( StructKeyExists( rd, "model" ) ) {
-				//Check the type's value 
-				var ev = getType( rd.model );
-				var pgArray = [];
-			
-				//...
-				if ( ev.type != 'array' && ev.type != 'struct' ) 
-					ArrayAppend(pgArray, {type=ev.type,value=ev.value});
-				else if ( ev.type == 'struct' ) {
-					//check for 'exec' and just save that string, only exec is allowed right now
-					if ( StructKeyExists( ev.value, "exec" ) ) 
-						ArrayAppend(pgArray, {type="execution",value=ev.value.exec});
-					else {
-						renderPage( 
-							status=500
-						, err={}
-						, content="Model struct does not contain 'exec' key (check key at #rd.file#)"
-						);
-					}
-				}
+			//Check the type's value 
+			var pgArray = [];
+			var ev = getType( rd );
+		
+//writedump( ev ); abort;
+			//Build an array out of whatever value the model may be...
+			if ( ev.type != 'array' && ev.type != 'struct' ) {
+				ArrayAppend(pgArray, {type=ev.type,value=ev.value});
+writedump( 'got #ev.type# at model.' );
+			}
+			else if ( ev.type == 'struct' ) {
+				renderPage(500, "Models as structs are not yet supported (please check key at #rd.file#).");
+				/*
+				//check for 'exec' and just save that string, only exec is allowed right now
+				if ( StructKeyExists( ev.value, "exec" ) ) 
+					ArrayAppend(pgArray, {type="execution",value=ev.value.exec});
 				else {
-					for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
-						var ee = ev.value[ ind ]; 
-						var ey = getType( ee );	
-						if ( ey.type == "string" || ey.type == "closure" )
-							ArrayAppend(pgArray, {type=ey.type,value=ey.value});
-						else if ( ey.type == "struct" ) {
-							if ( StructKeyExists( ey.value, "exec" ) )
-								ArrayAppend(pgArray, {type="execution",value=ey.value.exec});
-							else {
-								renderPage( 
-									status=500
-								, err={}
-								, content="Model struct does not contain 'exec' key (check key at #rd.file#)"
-								);
-							}
-						}
-						else {
-							renderPage( 
-								status=500
-							, content="Error loading model reference at #ind# at key '#rd.file#'"
-							, err={}
-							);
-						}
-					}
+					renderPage(500,"Model struct does not contain 'exec' key (check key at #rd.file#)");
 				}
-
-				//Now load each model, should probably put these in a scope
-				for ( var page in pgArray ) {
-					var callStat;
-					if ( page.type == "string" ) {
-						callStat = _include( where="app", name=page.value );
-						if ( !callStat.status ) {
-							renderPage( 
-								status=500
-							, content="Error executing model file '#page.value#'"
-							, err=callStat.errors 
-							);
+				*/
+			}
+			else {
+				for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
+					var ee = ev.value[ ind ]; 
+					var ey = getType( ee );	
+					if ( ey.type == "string" || ey.type == "closure" )
+						ArrayAppend(pgArray, {type=ey.type,value=ey.value});
+					else if ( ey.type == "struct" ) {
+						ArrayAppend(pgArray, {type=ey.type,value=ey.value});
+						//renderPage(500, "Models as structs are not yet supported (please check key at #rd.file#).");
+						/*
+						if ( StructKeyExists( ey.value, "exec" ) )
+							ArrayAppend(pgArray, {type="execution",value=ey.value.exec});
+						else {
+							renderPage(500, "Model struct does not contain 'exec' key (check key at #rd.file#)");
 						}
-					}
-					else if ( page.type == "execution" ) {
-						//there is nothing really to do here...
+						*/
 					}
 					else {
-						try {
-							page.value( /*Passing something in makes things easy*/ );
+						renderPage(500,"Error: got unsupported type for model at index #ind# at key '#rd.file#'");
+					}
+				}
+			}
+
+			//Now load each model, should probably put these in a scope
+			for ( var page in pgArray ) {
+				var c;
+				if ( page.type == "string" ) {
+					var path = "#getRootDir()#app/#page.value#";
+					if ( FileExists( path & ".cfc" ) ) {
+						//Could I include things here...
+						c = createObject( "component", "app.#page.value#" ).init( this );
+						//How to evaluate types? 
+writedump( getType( c ) ); writedump( c );  abort;
+					}
+					else if ( FileExists( path & ".cfm" ) ) {
+						c = _include( where="app", name=page.value );
+						if ( !c.status ) {
+							renderPage(500, "Error executing model file '#page.value#'",c.errors);
 						}
-						catch (any e) {
-							renderPage( 
-								status=500
-							, content="Error executing model closure at #rd.file#"
-							, err=e
-							);
-						}
+					}
+					else {
+						//The file couldn't be found. 
+						renderPage(500, "Could not locate model file '#page.value#'" );
+					}
+				}
+				//Model can be a struct too, this automatically puts things in things...
+				else if ( page.type == "struct" ) {
+					//Loop through each key in the struct 
+					renderPage( 500, "Models as structs currently aren't supported." );
+				}
+				//This catches closures...
+				else {
+					try {
+						page.value( /*Passing something in makes things easy*/ );
+					}
+					catch (any e) {
+						renderPage( 500, "Error executing model closure at #rd#", e );
 					}
 				}
 			}
 		}
 		catch (any e) {
 			//Manually wrap the error template here.
-			renderPage(status=500, err=e, content="Error executing models at: '#rd.file#'" );
+			renderPage( 500, "Error executing models at: '#rd#'", e );
 		}
 	}
 
@@ -1426,17 +1427,13 @@ accessors=true
 	 *
 	 * Generate a page through the page generation cycle.
 	 */
-	public function makeIndex (Myst MystInstance) {
-		//Define some local things
-		//var oScope;
-		//var nScope;
-		//var resName;
-
+	public function makeIndex (Myst MystInstance, globs) {
 		//TODO: Change these from global scope when full object conversion happens.
 		variables.coldmvc = MystInstance;
 		variables.myst = MystInstance;
 		variables.data = MystInstance.app;
 		//variables.db = MystInstance.app.data;
+//writedump( globs ); abort;
 
 		//Load all the components should have been loaded...
 		try {
@@ -1462,9 +1459,8 @@ accessors=true
 					var vv = Replace( q.name, ".cfc", "" );
 					var m = MystInstance;
 					var cname = Replace( q.name, ".cfc", "" );
-					var cmp 
-					= variables[ vv ]
-					= g[cname] 
+					//= g[cname] 
+					var cmp = globs[ vv ] = variables[ vv ]
 					= createObject( "component", "components.#vv#" ).init(
 							mystObject = m 
 						, realname = cname
@@ -1476,6 +1472,8 @@ accessors=true
 				}
 				logReport("SUCCESS!");
 			}
+//writedump( getComponents() ); abort;
+//writedump( globs ); abort;
 			logReport("SUCCESS - All components loaded!");
 		}
 		catch (any e) {
@@ -1653,7 +1651,7 @@ accessors=true
 		//This is where rethinking things could help, scope should be another argument.
 		if ( StructKeyExists( rd, "model" ) ) {
 			//The status should return here, and errors handled
-			evalModel( rd );	
+			evalModel( rd.model );	
 		}
 
 		//Filter out the scope when returning JSON
@@ -2314,7 +2312,7 @@ accessors=true
 	 * Initialize Myst.  
 	 * TODO: This should only happen once.
 	 */
-	public Myst function init (Struct appscope) {
+	public Myst function init ( Struct globals ) {
 		//Define things
 		var appdata;
 		//this.href = this.link;
@@ -2340,18 +2338,6 @@ accessors=true
 		setPathSep( ( server.os.name eq "Windows" ) ? "\" : "/" );
 		for ( var k in getArrayConstantMap() ) constantMap[ k ] = getRootDir() & k;
 		setConstantMap( constantMap );
-
-		//Add pre and post
-		if ( StructKeyExists(appscope, "post") )
-			setPostMap( appscope.post );
-		if ( StructKeyExists(appscope, "pre") )
-			setPreMap( appscope.pre );
-		if ( StructKeyExists(appscope, "objects") ) {
-			var obj = getObjects();
-			for ( var x in appscope.objects ) {
-				StructInsert( obj, x, appscope.objects[x] );
-			}
-		}
 
 		//Now I can just run regular stuff
 		try {
