@@ -171,6 +171,7 @@ accessors=true
 	property name="pageError" default="";
 	property name="pageErrorExtractors" default="detail,message,type"; /*tagContext,stackTrace*/
 	property name="components" type="struct";
+	property name="content";
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
@@ -933,11 +934,20 @@ accessors=true
 		return tr;
 	}
 
+	private array function queryToArray( Required Query arg ) {
+		var ar = ArrayNew(1);
+		for ( var v in arg ) ArrayAppend( ar, v );
+		return ar;
+	}
+
 	//Return pretty JSON with the correct casing from one place...
 	public String function queryToJSON ( Required Query arg ) {
+		/*
 		var ar = ArrayNew(1);
 		for ( var v in arg ) ArrayAppend( ar, v );
 		return SerializeJSON( ar );
+		*/
+		return SerializeJSON( queryToArray( arg ) );
 	}
 
 	//Return pretty JSON with the correct casing from one place...
@@ -1040,55 +1050,79 @@ accessors=true
 	 * contentHandler 
 	 *
 	 * Send a 200 along with whatever was asked for.
+	 * 
 	 */
 	private function contentHandler ( Required String mime, Required content ) {
 		sendResponse( status=200, mime=arguments.mime, content=arguments.content );
 	} 
-	
+
+
+	/**
+	 * populateErrorStructure( ... )
+	 *
+	 * Populate an error structure and return.
+	 * 
+	 */
+	private struct function populateErrorStructure ( Required Struct err ) {
+return null;
+	}
+
+
+	/**
+	 * returnCorrectString() 
+	 *
+	 * Return a formatted string dependent on the content-type.
+   * 
+	 */
+	private string function formatResponse ( Required c ) {
+		var rtype = getSelectedContentType();
+		var ctype = getType( c ).type;
+		if ( ( ctype eq "application/json" || ctype eq "json" ) && ctype eq "struct" ) 
+			return returnAsJson( c );
+		else if ( ctype eq "text/html" )
+			return c;
+		else {
+			return "Unsupported content-type requested.";
+		}
+	}	
 	
 	/**
 	 * renderPage
 	 *
 	 * Generates a page to send to stdout
 	 */
-	private function renderPage( Required Numeric status, Required content, Struct err, Boolean abort ) {
-		var errStruct = {};
-		var a = arguments;
-		var b = false;
+	private function renderPage( Required Numeric status, Required content, Struct err ) {
 		var h = getHttpHeaders();
 		var t = getType( arguments.content ).type;
 		var tt = getSelectedContentType();
-	
-		//TODO: Why is this here?
-		if ( ( !arguments.status || arguments.status == 200 ) && t eq "string" )
-			sendResponse( 200, tt, arguments.content );
-		else if ( arguments.status eq 200 && t eq "struct" ) {
-			//...
-			if ( StructKeyExists( arguments.content, "type" )) {  
-				if ( arguments.content.type eq "struct" && tt eq "application/json" )
-					sendResponse( arguments.status, tt, structToJSON( arguments.content.value ) ); 
-				else if ( arguments.content.type eq "query" && tt eq "application/json" )
-					sendResponse( arguments.status, tt, queryToJSON( arguments.content.value ) ); 
-				else {
-					sendResponse( arguments.status, tt, structToJSON( { message = "Invalid return type requested." } ) ); 
-				} 	
-			}
-			else if ( /*arguments.content.type eq "struct" &&*/ tt eq "application/json" )
-				sendResponse( arguments.status, tt, structToJSON( arguments.content ) ); 
-			else {
-				var e = { message = "application/json is the only other format supported." };
-				sendResponse( 500, tt, structToJSON( e ) ); 
-			}
-		}  
-		else if ( arguments.status eq 200 && t eq "query" ) {
-			if ( /*arguments.content.type eq "struct" &&*/ tt eq "application/json" )
-				sendResponse( arguments.status, tt, queryoToJSON( arguments.content ) ); 
-			else {
-				var e = { message = "application/json is the only other format supported." };
-				sendResponse( 500, tt, structToJSON( e ) ); 
-			}
-		}  
 
+		//DEBUG: Dump things when they need dumping...
+		//writedump( status );writedump( content ); abort;
+
+		//SANITY CHECKS HERE	
+		//TEST #1: If t is not string or struct, don't even try...
+		if ( t neq "string" && t neq "struct" )
+			sendResponse( 500, tt, formatResponse( "type #t# is an invalid return format." ) ); 
+
+		//TEST #2: If status is invalid, return a failure
+		//TEST #3: If an invalid content-type is requested, return a failure
+
+		//Catch successful responses here and stop.
+		if ( ( !arguments.status || arguments.status == 200 ) ) {
+			//Send the correct type back based on content-type requested
+			sendResponse( 200, tt, returnAsJson( arguments.content ) );
+		}
+
+		//??? - What exactly does this error handling code do?
+		//1. Checks if an error was given in arguments.err	
+		//2. Sets status, header, general message, descriptive message
+		//3. Replace arguments.content (or whatever) with a combination of content and error structure
+		//If HTML, it should be a page
+		//If anything else, it should be turned into a specific format
+
+		//I want this thing to either return content, or spit out at the end of renderPage... 
+
+		//This should be in a private method.  It figures out the correct type of error to throw back
 		//If an error struct is given and it has something in it, do...
 		if ( !StructKeyExists( arguments, "err" ) || StructIsEmpty( arguments.err ) ) {
 			setPageStatus( arguments.status );
@@ -1140,46 +1174,43 @@ accessors=true
 			} 
 		}
 
-		//...
-		var c = getSelectedContentType();
-		if ( c == "application/json" || c == "json" ) {
+		//Return the error with the right content type.
+		if ( tt == "application/json" || tt == "json" ) {
 			var e = {};
 			for ( var k in getPageErrorExtractors() ) e[ k ] = err[ k ];
 			sendResponse( arguments.status, getSelectedContentType(), structToJSON( e ) ); 
 		}
-		else if ( c == "text/plain" ) {
-			abort;
-		}
-		else if ( c == "text/xml" || c == "xml" ) {
-			sendResponse( 500, getSelectedContentType(), "Myst does not support text/xml mimetype returns yet." );
-			abort;
-		}
 		else if ( c == "text/html" ) {
 			var f = ( arguments.status > 399 && arguments.status < 500 ) ? 4 : 5;
 			//_include the chosen view page
-			var a; 
+			var cs; 
+			var content; 
 			savecontent variable="content" {
-				a = _include( where="std", name="#f#xx-view" );
+				cs = _include( where="std", name="#f#xx-view" );
 			}
 
-			if ( !a.status ) {
-				setPageMessage( a.message );
-				sendResponse( 500, getSelectedContentType(), a.message );
+			if ( !cs.status ) {
+				setPageMessage( cs.message );
+				sendResponse( 500, getSelectedContentType(), cs.message );
 			}
 
 			sendResponse( arguments.status, getSelectedContentType(), content );
 		}
 		else {
 			//You might need a default handler or a custom handler for certain types... 
+			sendResponse( 500, tt, "Myst does not support text/xml mimetype returns yet." );
 		}
 
 		//If err is present and not empty, then this is an error and is streamed and handled by me
 		//Jump and die
+		/*
 		if ( StructKeyExists( arguments, "abort" ) && arguments.abort eq true )
 			abort;
 		else {
 			return { status = true, message = "SUCCESS" }
 		}
+		*/
+		return { status = true, message = "SUCCESS" }
 	}
 
 
@@ -1249,6 +1280,7 @@ accessors=true
 			if ( StructKeyExists( rd, "model" ) ) {
 				evalModel( rd.model );
 			}
+			//Evaluating hooks can be done differently...
 			if ( StructKeyExists( rd, "view" ) ) {
 				evalView( rd );
 			}
@@ -1271,22 +1303,51 @@ accessors=true
 	}
 
 
-	//...
-	private function evalModel( Required rd ) {
+	private function returnAsJson( Struct model ) {
+		//Filtering should have already been run by this time
+		for ( var k in model ) {
+			//v should always be a struct with at least a key and value
+			var v = model[k];
+			var t = getType( v );
+			var c;
+			//writedump( v ); writedump( model[v] ); writeoutput( "<h2>#k#</h2>" );
+			if ( t.type eq "struct" || t.type eq "array" ) 
+				c = v; //writeoutput( SerializeJSON( v ) );	
+			else if ( t.type eq "query" ) 	
+				c = queryToArray(v); //writeoutput( queryToJSON( v ) );	
+			else {
+				//If we got this far, it's probably a scalar value
+				//writeoutput( "Scalar type is #t.type#" );
+				c = ( LCase( t.type ) eq "string" ) ? "#v#" : v;//writeoutput( v );
+			}
+			model[ k ] = c;
+		}
+		//writeoutput( structToJSON( model ) ); abort;		
+		return structToJSON( model );		
+	}
+
+
+	/*
+	 * evalModel ( Required rd )
+	 *
+   * Return a struct composed of elements and keys...
+	 *
+	 **/		
+	private struct function evalModel( Required rd ) {
 		logReport( "Evaluating models @ /#data.page#..." );
 		try {
 			//Check the type's value 
 			var pgArray = [];
 			var ev = getType( rd );
+			var result = {};
 		
-//writedump( ev ); abort;
 			//Build an array out of whatever value the model may be...
 			if ( ev.type != 'array' && ev.type != 'struct' ) {
 				ArrayAppend(pgArray, {type=ev.type,value=ev.value});
-writedump( 'got #ev.type# at model.' );
+				//writedump( 'got #ev.type# at model.' );
 			}
 			else if ( ev.type == 'struct' ) {
-				renderPage(500, "Models as structs are not yet supported (please check key at #rd.file#).");
+				renderPage(500, "Models as structs are not yet supported (check key at #rd.file#).");
 				/*
 				//check for 'exec' and just save that string, only exec is allowed right now
 				if ( StructKeyExists( ev.value, "exec" ) ) 
@@ -1321,20 +1382,19 @@ writedump( 'got #ev.type# at model.' );
 
 			//Now load each model, should probably put these in a scope
 			for ( var page in pgArray ) {
-				var c;
 				if ( page.type == "string" ) {
 					var path = "#getRootDir()#app/#page.value#";
 					if ( FileExists( path & ".cfc" ) ) {
 						//Could I include things here...
-						c = createObject( "component", "app.#page.value#" ).init( this );
-						//How to evaluate types? 
-writedump( getType( c ) ); writedump( c );  abort;
+						result[ page.value ] = createObject( "component", "app.#page.value#" ).init( this );
 					}
+					//This usually assumes a string...
 					else if ( FileExists( path & ".cfm" ) ) {
-						c = _include( where="app", name=page.value );
+						var c = _include( where="app", name=page.value );
 						if ( !c.status ) {
 							renderPage(500, "Error executing model file '#page.value#'",c.errors);
 						}
+						result[ page.value ] = c.ref;
 					}
 					else {
 						//The file couldn't be found. 
@@ -1349,7 +1409,9 @@ writedump( getType( c ) ); writedump( c );  abort;
 				//This catches closures...
 				else {
 					try {
-						page.value( /*Passing something in makes things easy*/ );
+						//We can pass something in
+						//result[ page.value ] = 
+						page.value( result );
 					}
 					catch (any e) {
 						renderPage( 500, "Error executing model closure at #rd#", e );
@@ -1361,6 +1423,7 @@ writedump( getType( c ) ); writedump( c );  abort;
 			//Manually wrap the error template here.
 			renderPage( 500, "Error executing models at: '#rd#'", e );
 		}
+		return result;
 	}
 
 
@@ -1391,11 +1454,13 @@ writedump( getType( c ) ); writedump( c );  abort;
 				var ev = getType( rd.view );
 				//Custom message is needed here somewhere...
 				if ( ev.type != "string" && ev.type != "array" ) {
-					renderPage( 
+					renderPage(500, "View value for '#rd.file#' was not a string or array.", {});
+					/*
 						status=500
 					, err={} 
 					, content="View value for '#rd.file#' was not a string or array."
 					);
+					*/
 				}
 
 				//Set pageArray if it's string or array
@@ -1403,20 +1468,23 @@ writedump( getType( c ) ); writedump( c );  abort;
 
 				//Now load each model, should probably put these in a scope
 				for ( var x in pageArray ) {
-					var callStat = _include( where="views", name=x );
-					if ( !callStat.status ) {
-						renderPage( 
+					var cs = _include( where="views", name=x );
+					if ( !cs.status ) {
+						renderPage(500,"Error loading view at page '#x#'.",cs.errors);
+						/*
 							status=500
 						, err=callStat.errors 
 						, content="Error loading view at page '#x#'."
 						);
+						*/
 					}
 				}
 			}
 		} 
 		catch (any e) {
 			//Manually wrap the error template here.
-			renderPage( status=500, err=e, content="Error in parsing view." );
+			//renderPage( status=500, err=e, content="Error in parsing view." );
+			renderPage(500, "Error in parsing view.", e );
 		}
 
 		return the_page_content;
@@ -1472,12 +1540,10 @@ writedump( getType( c ) ); writedump( c );  abort;
 				}
 				logReport("SUCCESS!");
 			}
-//writedump( getComponents() ); abort;
-//writedump( globs ); abort;
 			logReport("SUCCESS - All components loaded!");
 		}
 		catch (any e) {
-			renderPage( status=500, content="Component load failed.", err=e );
+			renderPage( 500, "Component load failed.", e );
 		}
 
 		//Route injection should happen here.
@@ -1490,17 +1556,19 @@ writedump( getType( c ) ); writedump( c );  abort;
 				var n = Replace( q.name, ".cfm", "" );
 				callstat = _include( where = "routes", name = n );
 				if ( !callstat.status ) {
-					renderPage( 
+					renderPage( 500, "Syntax error at routes/#n#", callstat.errors );
+					/*
 						status=500
 					, err=callstat.errors
 					, content="Syntax error at routes/#n#"
 					);
+					*/
 				}
 			}
 			logReport("SUCCESS - All routes loaded!");
 		}
 		catch (any e) {
-			renderPage( status=500, content="Route injection failed.", err=e );
+			renderPage( 500, "Route injection failed.", e );
 		}
 
 		//Build "full" routing table by adding inherited keys and whatnot...
@@ -1536,7 +1604,7 @@ writedump( getType( c ) ); writedump( c );  abort;
 			logReport("SUCCESS!");
 		}
 		catch (any e) {
-			renderPage( status=500, content="Error rebuilding route index.", err=e );
+			renderPage( 500, "Error rebuilding route index.", e );
 		}
 
 		//Find the right resource.
@@ -1555,12 +1623,12 @@ writedump( getType( c ) ); writedump( c );  abort;
 
 			//Send a 404 page and be done if this resource was not specified in data.cfm
 			if ( rd.status eq 404 ) {
-				renderPage( status=404, content="Resource not found.", err={} ); 
+				renderPage( 404, "Resource not found.", {} ); 
 			}
 			logReport( "SUCCESS!" );
 		}
 		catch (any e) {
-			renderPage( status=500, content="Locating resource mapping failed.", err=e );
+			renderPage( 500, "Locating resource mapping failed.", e );
 		}
 
 		//With this new system in place, some things have higher precedence...
@@ -1574,6 +1642,9 @@ writedump( getType( c ) ); writedump( c );  abort;
 
 		//The scope should carry things over...
 		var scope = {};  
+		//The model is added to here, but it might need to be a property...
+		var model;
+
 		if ( StructKeyExists( rd, "scope" ) ) {
 			logReport( "Evaluating key 'scope' @ /#data.page#..." );
 			scope = rd.scope;	
@@ -1597,6 +1668,12 @@ writedump( getType( c ) ); writedump( c );  abort;
 		if ( StructKeyExists( rd, "before" ) ) {
 			logReport( "Evaluating key 'returns' @ /#data.page#..." );
 			evalHook( rd.before, scope );
+			//Evaluate any models, etc
+			if ( StructKeyExists( rd.before, "model" ) ) 
+				0;//evalModel( rd.before.model, scope );
+			//Evaluate any views, this should probably just be a string
+			if ( StructKeyExists( rd.before, "view" ) ) 
+				0;//evalView( rd.before.view, scope );
 			//Get the type of rd.before
 			logReport( "SUCCESS!" );
 		}
@@ -1606,7 +1683,8 @@ writedump( getType( c ) ); writedump( c );  abort;
 			logReport( "Evaluating key 'accepts' @ /#data.page#..." );
 			//If the method is NOT a member of rd.accepts, die...
 			if ( ArrayFind( ListToArray( rd.accepts ), cgi.request_method ) == 0 ) {
-				renderPage( status=405, content="This endpoint does not accept method '#cgi.request_method#'" ); 
+				renderPage(405, "This endpoint does not accept method '#cgi.request_method#'");
+				//renderPage( status=405, content="This endpoint does not accept method '#cgi.request_method#'" ); 
 			}
 			logReport( "SUCCESS!" );
 		}
@@ -1634,7 +1712,8 @@ writedump( getType( c ) ); writedump( c );  abort;
 				if ( !kFind[ f ].found ) {
 					var content = "This endpoint expected variables it did not receive.";
 					//TODO: If no err and status is greater than 399, type is 'custom', detail, I dunno...
-					renderPage( status=412, content=content, err={ message=content,detail="",type="" } );
+					//renderPage( status=412, content=content, err={ message=content,detail="",type="" } );
+					renderPage(412, content, err={ message=content,detail="",type="" } );
 				}
 			}
 			logReport( "SUCCESS!" );
@@ -1651,7 +1730,11 @@ writedump( getType( c ) ); writedump( c );  abort;
 		//This is where rethinking things could help, scope should be another argument.
 		if ( StructKeyExists( rd, "model" ) ) {
 			//The status should return here, and errors handled
-			evalModel( rd.model );	
+			model = evalModel( rd.model );	
+
+			//The models could dump out here... depending on how one wants to run it...
+			//writedump( returnAsJson( model ) ); abort;
+			//writedump( model ); abort;	
 		}
 
 		//Filter out the scope when returning JSON
@@ -1670,16 +1753,23 @@ writedump( getType( c ) ); writedump( c );  abort;
 		}
 
 		//Run a view
-		var the_page_content;
-		if ( StructKeyExists( rd, "view" ) ) {
+		//var the_page_content;
+		if ( !StructKeyExists( rd, "view" ) ) 
+			setContent( model );
+		else {
 			//Check the type and serialize...
 			logReport( "Evaluating views @ /#data.page#..." );
 			the_page_content = evalView( rd );
+			setContent( evalView( rd ) );
 		}
+		/*
 		else {
 			//getScope and search for type of what was wanted
-			the_page_content = getScope( "*" );
+			//the_page_content = getScope( "*" );
+			the_page_content = model;
+			setContent( model );
 		}
+		*/
 
 		if ( StructKeyExists( rd, "after" ) ) {
 			logReport( "Evaluating key 'after' @ /#data.page#..." );
@@ -1688,8 +1778,9 @@ writedump( getType( c ) ); writedump( c );  abort;
 			logReport( "SUCCESS!" );
 		}
 
-//writedump( the_page_content );writedump( getScope("model") );abort;
-		var rp = renderPage( status=200, content=the_page_content );
+		//Render the final payload...
+		//var rp = renderPage( status=200, content=the_page_content );
+		var rp = renderPage( 200, getContent() );
 		if ( rp.status )
 			return 1;
 		else {
@@ -2354,14 +2445,14 @@ writedump( getType( c ) ); writedump( c );  abort;
 		}
 		catch (any e) {
 			logReport( "Failure!" );
-			renderPage( status=500, content="Deserializing data.cfm failed", err=e );
+			renderPage( 500, "Deserializing data.cfm failed", e );
 			abort;
 		}
 
 		//Check that JSON manifest contains everything necessary.
 		for ( var key in [ "base", "routes" ] ) {
 			if ( !StructKeyExists( appdata, key  ) ) {
-				renderPage( status=500, content="Struct key '"& key &"' not found in data.cfm.", err={} );
+				renderPage( 500, "Struct key '"& key &"' not found in data.cfm.", {} );
 			}
 		}
 
