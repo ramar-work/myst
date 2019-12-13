@@ -111,12 +111,6 @@ accessors=true
 	//Set all http headers once at the top or something...
 	property name="httpHeaders" type="struct"; 
 
-	//....
-	property name="mimeToFileMap" type="struct"; 
-
-	//....
-	property name="fileToMimeMap" type="struct"; 
-
 	//Set post functions
 	property name="postMap"; 
 
@@ -171,11 +165,16 @@ accessors=true
 	property name="pageError" default="";
 	property name="pageErrorExtractors" default="detail,message,type"; /*tagContext,stackTrace*/
 	property name="components" type="struct";
+	property name="mimetypes" type="struct";
+	property name="commonExtensionsToMimetypes" type="struct";
 	property name="content";
+	property name="headers" type="struct";
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
 	property name="objects" type="struct";
+	property name="mimeToFileMap" type="struct"; 
+	property name="fileToMimeMap" type="struct"; 
 
 	//property name="pageScope" type="struct"; //setter=false getter=false;
 	variables.pageScope = {}; //setter=false getter=false;
@@ -1030,19 +1029,22 @@ accessors=true
 	/**
 	 * sendResponse
 	 *
-	 * Send...
+	 * Send a response.
 	 */
-	private function sendResponse ( Required status, Required mime, Required content, Struct headers, Boolean abort ) {
+	private function sendResponse (Required Numeric s, Required String m, Required String c, Struct headers) {
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
 		//TODO: Why is this not setting the status message...
 		//w.flush(); //this is a function... thing needs to shut de fuk up
-		r.setStatus( arguments.status, getHttpHeaders()[ arguments.status ] );
-		r.setContentType( arguments.mime );
-		w.print( arguments.content );
+		r.setStatus( status, getHttpHeaders()[ s ] );
+		r.setContentType( m );
+		w.print( c );
+		/*
 		if ( !StructKeyExists( arguments, "abort" ) || arguments.abort eq true ) {
 		 abort;
 		}
+		*/
+		abort;
 	}
 
 
@@ -1092,124 +1094,104 @@ return null;
 	 * Generates a page to send to stdout
 	 */
 	private function renderPage( Required Numeric status, Required content, Struct err ) {
-		var h = getHttpHeaders();
 		var t = getType( arguments.content ).type;
 		var tt = getSelectedContentType();
-
-		//DEBUG: Dump things when they need dumping...
-		//writedump( status );writedump( content ); abort;
+		var error = {};
+		var headers = {};
+		var newContent;
 
 		//SANITY CHECKS HERE	
 		//TEST #1: If t is not string or struct, don't even try...
-		if ( t neq "string" && t neq "struct" )
-			sendResponse( 500, tt, formatResponse( "type #t# is an invalid return format." ) ); 
+		if ( t neq "string" && t neq "struct" ) {
+			newContent = formatResponse( "type #t# is an invalid return format." );
+			status = 500; 
+		}
 
 		//TEST #2: If status is invalid, return a failure
+		if ( !status || status < 100 || status > 599 ) {
+			newContent = formatResponse( "Expected HTTP status is invalid." ); 
+			status = 500; 
+		}
+
 		//TEST #3: If an invalid content-type is requested, return a failure
-
-		//Catch successful responses here and stop.
-		if ( ( !arguments.status || arguments.status == 200 ) ) {
-			//Send the correct type back based on content-type requested
-			sendResponse( 200, tt, returnAsJson( arguments.content ) );
+		if ( !StructKeyExists( getMimetypes(), tt ) ) {
+			newContent = formatResponse( "Expected HTTP content type is invalid." );
+			status = 500; 
 		}
 
-		//??? - What exactly does this error handling code do?
-		//1. Checks if an error was given in arguments.err	
-		//2. Sets status, header, general message, descriptive message
-		//3. Replace arguments.content (or whatever) with a combination of content and error structure
-		//If HTML, it should be a page
-		//If anything else, it should be turned into a specific format
-
-		//I want this thing to either return content, or spit out at the end of renderPage... 
-
-		//This should be in a private method.  It figures out the correct type of error to throw back
-		//If an error struct is given and it has something in it, do...
-		if ( !StructKeyExists( arguments, "err" ) || StructIsEmpty( arguments.err ) ) {
-			setPageStatus( arguments.status );
-			setPageStatusMessage( getHttpHeaders()[arguments.status] );
-			if ( getPageStatus() eq 401 )
-				setPageMessage( "The client asked for access to a page it does not have access to." );
-			else if ( getPageStatus() eq 404 )
-				setPageMessage( "The client made a request for " &
-					"<u>#cgi.script_name# and it was not found on this server." );
-			else {
-				setPageMessage( "Unspecified error occurred." );
-			}
-			for ( var k in getPageErrorExtractors() ) {
-				err[ k ] = "";
-			}
-		}
-		else {
-			//What if it's a 200?
-			setPageError( arguments.err );
-			if ( arguments.status > 499 ) {
-				setPageStatus( arguments.status );
-				setPageStatusMessage( getHttpHeaders()[arguments.status] );
-				//Handle errors of different exception types
-				if ( !StructKeyExists( arguments.err, "type" ) )
-					setPageMessage( "An undefined error has occurred." );
-				else if ( err.type eq "Application" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Database" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Template" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Object" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Expression" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Security" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Lock" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "Any" )
-					setPageMessage( "An '#err.type#' error has occurred." );
-				else if ( err.type eq "MissingInclude" ) {
-					setPageMessage( "An '#err.type#' error has occurred. " &
-					"#err.MissingFileName# was not found in the application structure" );
-				}
-				else {
-					setPageMessage( "A '#err.type#' error has occurred." );
-				}
-			} 
-		}
-
-		//Return the error with the right content type.
-		if ( tt == "application/json" || tt == "json" ) {
-			var e = {};
-			for ( var k in getPageErrorExtractors() ) e[ k ] = err[ k ];
-			sendResponse( arguments.status, getSelectedContentType(), structToJSON( e ) ); 
-		}
-		else if ( c == "text/html" ) {
-			var f = ( arguments.status > 399 && arguments.status < 500 ) ? 4 : 5;
-			//_include the chosen view page
-			var cs; 
-			var content; 
-			savecontent variable="content" {
-				cs = _include( where="std", name="#f#xx-view" );
-			}
-
-			if ( !cs.status ) {
-				setPageMessage( cs.message );
-				sendResponse( 500, getSelectedContentType(), cs.message );
-			}
-
-			sendResponse( arguments.status, getSelectedContentType(), content );
-		}
-		else {
-			//You might need a default handler or a custom handler for certain types... 
-			sendResponse( 500, tt, "Myst does not support text/xml mimetype returns yet." );
-		}
-
-		//If err is present and not empty, then this is an error and is streamed and handled by me
-		//Jump and die
 		/*
-		if ( StructKeyExists( arguments, "abort" ) && arguments.abort eq true )
-			abort;
-		else {
-			return { status = true, message = "SUCCESS" }
-		}
+		err should have:
+		- status
+		- status message
+		- official coldfusion exception type or 'unknown exception occurred'
+		- message about what went wrong (simple, abridged, brief)
+		optionally:
+		- detailed message (complex, unabridged, detailed)
+		- stack trace (formatted to the best of ability)
 		*/
+
+		//Check error status and prepare an error structure if one is not provided
+		if ( status > 399 ) {
+			//Set common items
+			error.status = status;
+			error.statusMessage = getHttpHeaders()[status]; 
+			error.brief = ( t eq "string" ) ? arguments.content : "Unspecified error occurred.";
+
+			/*
+			if ( StructKeyExists( arguments, "err" ) ) {
+				var ktype = ( !StructKeyExists(err, "type") ) ? "undefined" : err.type;
+				error.brief = "An #ktype# error has occurred.";
+			}
+			else
+			*/
+			if ( !StructKeyExists( arguments, "err" ) || StructIsEmpty( arguments.err ) ) {
+				for ( var k in getPageErrorExtractors() ) err[ k ] = "";
+				if ( status eq 401 )
+					error.detailed = "The client asked for access to a page it does not have access to.";
+				else if ( status eq 404 ) {
+					error.detailed = "The client made a request for '#cgi.script_name#' and it was not found on this server.";
+				}
+			}
+			else {
+				//Handle errors of different exception types
+				var ktype = (!StructKeyExists(err, "type")) ? "undefined" : err.type;
+				error.brief = "An #ktype# error has occurred.";
+				/*
+				if ( !StructKeyExists( arguments.err, "type" ) )
+					error.brief = "An undefined error has occurred.";
+				else {
+					error.brief = "An '#err.type#' error has occurred.";
+				}
+				*/
+			}
+
+			//DEBUG: Dump things when they need dumping...
+			writedump( status ); writedump(tt); writedump( content );
+
+
+			if ( tt == "text/html" ) {
+				//var f = ( status > 399 && status < 500 ) ? 4 : 5;
+				var cs; 
+				savecontent variable="newContent" {
+					cs = _include( 
+						where="std", 
+						name="#iif(status>399 && status<500,DE('4'),DE('5'))#xx-view" 
+					);
+				}
+
+				if ( !cs.status ) {
+					error.brief = cs.message;
+					status = 500;
+				}
+			}
+
+		}
+
+		//DEBUG: For testing only
+		//writedump( { status=true,httpStatus=status,mimetype=tt,content=content } ); abort;
+		//This should always be the last step...
+		sendResponse( status, tt, content );
+		//sendResponse( status, tt, newContent );
 		return { status = true, message = "SUCCESS" }
 	}
 
@@ -1657,7 +1639,7 @@ return null;
 			if ( getType( rd.returns ).type neq "string" ) {
 				renderPage( 500, "Value at key 'returns' in struct associated with '#data.page#' is not a string." );
 			}	
-			if ( !StructKeyExists( getMimeToFileMap(), rd.returns ) ) {
+			if ( !StructKeyExists( getMimeTypes(), rd.returns ) ) {
 				renderPage( 500, "Unsupported return type '#rd.returns#' was selected." );
 			}
 			setSelectedContentType( rd.returns );	
@@ -2413,8 +2395,8 @@ return null;
 		//way to do it.  It's going to have something to do with this step and
 		//Application.cfc)
 		setHttpHeaders( createObject( "component", "std.components.httpHeaders" ).init() );
-		setMimeToFileMap( createObject( "component", "std.components.mimes" ).init() );
-		setFileToMimeMap( createObject( "component", "std.components.files" ).init() );
+		setMimetypes( createObject( "component", "std.components.mimes" ).init() );
+		setCommonExtensionsToMimetypes( createObject( "component", "std.components.files" ).init() );
 
 		//Invoke an id to track what happens during hte session
 		setRunId( randstr(32) );
