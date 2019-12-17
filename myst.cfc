@@ -169,6 +169,8 @@ accessors=true
 	property name="commonExtensionsToMimetypes" type="struct";
 	property name="content";
 	property name="headers" type="struct";
+	property name="defaultModelKey" type="string" default="model";
+	property name="defaultErrorKey" type="string" default="error";
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
@@ -1014,17 +1016,6 @@ accessors=true
 
 	/** RESPONSE **
  * --------------------------------------------------------------------- */
-	//This one includes pages in paths
-	private function pageHandler ( Required content, Required String pgPath , String rtHref, Required Numeric status ) {
-		/*
-		var r = getPageContext().getResponse();
-		var w = r.getWriter();
-		r.setContentType( "text/html" );
-		w.print( arguments.content );
-		r.flush();
-		*/
-	}
-
 
 	/**
 	 * sendResponse
@@ -1035,7 +1026,7 @@ accessors=true
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
 		//TODO: Why is this not setting the status message...
-		//w.flush(); //this is a function... thing needs to shut de fuk up
+		w.flush(); //this is a function... thing needs to shut de fuk up
 		r.setStatus( status, getHttpHeaders()[ s ] );
 		r.setContentType( m );
 		w.print( c );
@@ -1044,48 +1035,37 @@ accessors=true
 		 abort;
 		}
 		*/
-		abort;
+		//abort;
 	}
 
 
 	/**
-	 * contentHandler 
-	 *
-	 * Send a 200 along with whatever was asked for.
-	 * 
-	 */
-	private function contentHandler ( Required String mime, Required content ) {
-		sendResponse( status=200, mime=arguments.mime, content=arguments.content );
-	} 
-
-
-	/**
-	 * populateErrorStructure( ... )
-	 *
-	 * Populate an error structure and return.
-	 * 
-	 */
-	private struct function populateErrorStructure ( Required Struct err ) {
-return null;
-	}
-
-
-	/**
-	 * returnCorrectString() 
+	 * formatRepsonse() 
 	 *
 	 * Return a formatted string dependent on the content-type.
-   * 
+   * TODO: Convert from some reusable closure instead of this...
 	 */
 	private string function formatResponse ( Required c ) {
 		var rtype = getSelectedContentType();
 		var ctype = getType( c ).type;
-		if ( ( ctype eq "application/json" || ctype eq "json" ) && ctype eq "struct" ) 
-			return returnAsJson( c );
-		else if ( ctype eq "text/html" )
+//Strings have to be return in key value format when returning JSON
+//same with XML
+//But not with any other content type 
+		if ( ctype eq "string" )
 			return c;
-		else {
-			return "Unsupported content-type requested.";
+		else if ( ctype eq "struct" ) {
+			if ( rtype eq "application/json" || rtype eq "json" )
+				return returnAsJson( c );
+			else if ( rtype eq "application/xml" || rtype eq "xml" )
+				return returnAsJson( c );
+			else {
+				//TODO: Should I throw an error or force conversion?
+				return "Unsupported return format requested.";
+			}
 		}
+
+		//Anything else is a failure
+		return c;
 	}	
 	
 	/**
@@ -1137,13 +1117,11 @@ return null;
 			error.statusMessage = getHttpHeaders()[status]; 
 			error.brief = ( t eq "string" ) ? arguments.content : "Unspecified error occurred.";
 
-			/*
 			if ( StructKeyExists( arguments, "err" ) ) {
 				var ktype = ( !StructKeyExists(err, "type") ) ? "undefined" : err.type;
 				error.brief = "An #ktype# error has occurred.";
 			}
 			else
-			*/
 			if ( !StructKeyExists( arguments, "err" ) || StructIsEmpty( arguments.err ) ) {
 				for ( var k in getPageErrorExtractors() ) err[ k ] = "";
 				if ( status eq 401 )
@@ -1152,22 +1130,21 @@ return null;
 					error.detailed = "The client made a request for '#cgi.script_name#' and it was not found on this server.";
 				}
 			}
+			/*
 			else {
 				//Handle errors of different exception types
 				var ktype = (!StructKeyExists(err, "type")) ? "undefined" : err.type;
 				error.brief = "An #ktype# error has occurred.";
-				/*
 				if ( !StructKeyExists( arguments.err, "type" ) )
 					error.brief = "An undefined error has occurred.";
 				else {
 					error.brief = "An '#err.type#' error has occurred.";
 				}
-				*/
 			}
+			*/
 
 			//DEBUG: Dump things when they need dumping...
 			writedump( status ); writedump(tt); writedump( content );
-
 
 			if ( tt == "text/html" ) {
 				//var f = ( status > 399 && status < 500 ) ? 4 : 5;
@@ -1184,14 +1161,23 @@ return null;
 					status = 500;
 				}
 			}
+		}
 
+
+		if ( status < 300 ) {
+			newContent = formatResponse( content );
 		}
 
 		//DEBUG: For testing only
 		//writedump( { status=true,httpStatus=status,mimetype=tt,content=content } ); abort;
 		//This should always be the last step...
-		sendResponse( status, tt, content );
-		//sendResponse( status, tt, newContent );
+		//sendResponse( status, tt, content );
+//writedump( status );writedump( tt );writedump( newContent ); abort;
+		try {
+		sendResponse( status, tt, newContent );
+} catch(any e) {
+writedump(e); abort;
+}
 		return { status = true, message = "SUCCESS" }
 	}
 
