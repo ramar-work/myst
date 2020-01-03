@@ -1023,18 +1023,19 @@ accessors=true
 	 * Send a response.
 	 */
 	private function sendResponse (Required Numeric s, Required String m, Required String c, Struct headers) {
+		//var r = getPageContext().getCFOutput().clear();
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
-		//TODO: Why is this not setting the status message...
-		w.flush(); //this is a function... thing needs to shut de fuk up
-		r.setStatus( status, getHttpHeaders()[ s ] );
+		if ( 0 ) {
+			//TODO: Why is this not setting the status message...
+			logReport( "Status:      #s#" );
+			logReport( "Status Line: #getHttpHeaders()[ s ]#" );
+			//logReport( "Content:     #c#" );
+		}
+		r.setStatus( s, getHttpHeaders()[ s ] );
 		r.setContentType( m );
 		w.print( c );
-		/*
-		if ( !StructKeyExists( arguments, "abort" ) || arguments.abort eq true ) {
-		 abort;
-		}
-		*/
+		w.flush(); //this is a function... thing needs to shut de fuk up
 		//abort;
 	}
 
@@ -1048,30 +1049,63 @@ accessors=true
 	private string function formatResponse ( Required c ) {
 		var rtype = getSelectedContentType();
 		var ctype = getType( c ).type;
-//Strings have to be return in key value format when returning JSON
-//same with XML
-//But not with any other content type 
-		if ( ctype eq "string" )
-			return c;
-		else if ( ctype eq "struct" ) {
+		var ERR_FMT_RESPONSE = "Unsupported input type given to formatResponse()";
+		var ERR_FMT_REQUEST = "Unsupported return format requested.";
+
+		//Strings have to be return in key value format when returning JSON
+		if ( ctype eq "string" ) {
 			if ( rtype eq "application/json" || rtype eq "json" )
-				return returnAsJson( c );
+				return returnAsJson( { "#getDefaultModelKey()#" = c } );
+		/*
 			else if ( rtype eq "application/xml" || rtype eq "xml" )
 				return returnAsJson( c );
+		*/
+			else {
+				return c;
+			}
+		}
+		else if ( ctype eq "struct" ) {
+			//TODO: Should I throw an error or force conversion?
+			if ( rtype eq "application/json" || rtype eq "json" )
+				return returnAsJson( c );
+			/*
+			else if ( rtype eq "application/xml" || rtype eq "xml" )
+				return returnAsJson( c );
+			*/
+			else {
+				return ERR_FMT_RESPONSE; 
+			}
+		}
+		else {
+			if ( rtype eq "application/json" || rtype eq "json" )
+				return returnAsJson( { "#getDefaultErrorKey()#" = ERR_FMT_RESPONSE } );
+			/*
+			else if ( rtype eq "application/xml" || rtype eq "xml" )
+				return returnAsJson( c );
+			*/
 			else {
 				//TODO: Should I throw an error or force conversion?
-				return "Unsupported return format requested.";
+				return ERR_FMT_RESPONSE;
 			}
 		}
 
 		//Anything else is a failure
 		return c;
 	}	
+
 	
 	/**
 	 * renderPage
 	 *
 	 * Generates a page to send to stdout
+		err should have:
+		- status
+		- status message
+		- official coldfusion exception type or 'unknown exception occurred'
+		- message about what went wrong (simple, abridged, brief)
+		optionally:
+		- detailed message (complex, unabridged, detailed)
+		- stack trace (formatted to the best of ability)
 	 */
 	private function renderPage( Required Numeric status, Required content, Struct err ) {
 		var t = getType( arguments.content ).type;
@@ -1098,17 +1132,6 @@ accessors=true
 			newContent = formatResponse( "Expected HTTP content type is invalid." );
 			status = 500; 
 		}
-
-		/*
-		err should have:
-		- status
-		- status message
-		- official coldfusion exception type or 'unknown exception occurred'
-		- message about what went wrong (simple, abridged, brief)
-		optionally:
-		- detailed message (complex, unabridged, detailed)
-		- stack trace (formatted to the best of ability)
-		*/
 
 		//Check error status and prepare an error structure if one is not provided
 		if ( status > 399 ) {
@@ -1144,7 +1167,7 @@ accessors=true
 			*/
 
 			//DEBUG: Dump things when they need dumping...
-			writedump( status ); writedump(tt); writedump( content );
+			//writedump( status ); writedump(tt); writedump( content ); abort;
 
 			if ( tt == "text/html" ) {
 				//var f = ( status > 399 && status < 500 ) ? 4 : 5;
@@ -1163,21 +1186,18 @@ accessors=true
 			}
 		}
 
-
 		if ( status < 300 ) {
 			newContent = formatResponse( content );
 		}
 
-		//DEBUG: For testing only
-		//writedump( { status=true,httpStatus=status,mimetype=tt,content=content } ); abort;
-		//This should always be the last step...
-		//sendResponse( status, tt, content );
-//writedump( status );writedump( tt );writedump( newContent ); abort;
 		try {
-		sendResponse( status, tt, newContent );
-} catch(any e) {
-writedump(e); abort;
-}
+			sendResponse( s=status, m=tt, c=newContent );
+		} 
+		catch( any e ) {
+			writedump(e); 
+			abort;
+		}
+
 		return { status = true, message = "SUCCESS" }
 	}
 
@@ -1200,8 +1220,9 @@ writedump(e); abort;
 		return a;
 	}
 
+
 	/**
-	 * sendAsJson (t)
+	 * sendQueryAsJson (t)
 	 *
 	 * Send a query back wrapped as a JSON object.
 	 */
@@ -1271,6 +1292,12 @@ writedump(e); abort;
 	}
 
 
+	/*
+	 * returnAsJson ( Struct model )
+	 *
+   * ...
+	 *
+	 **/		
 	private function returnAsJson( Struct model ) {
 		//Filtering should have already been run by this time
 		for ( var k in model ) {
@@ -1402,9 +1429,9 @@ writedump(e); abort;
 	 * Evaluates a view.
 	 */
 	private String function evalView( Required Struct rd ) {
+		logReport( "Evaluating views..." );
 		//Evaluate view
 		try {
-			logReport( "Evaluating views..." );
 			if ( !StructKeyExists( rd, "view" ) ) {
 				renderPage( 
 					status=500
@@ -1748,12 +1775,15 @@ writedump(e); abort;
 
 		//Render the final payload...
 		//var rp = renderPage( status=200, content=the_page_content );
+logReport( "before render page..." );
 		var rp = renderPage( 200, getContent() );
 		if ( rp.status )
 			return 1;
 		else {
 			return 0;
 		}
+logReport( "end of session, for real." );
+abort;
 	}
 
 
