@@ -47,6 +47,7 @@ NO_GIT=0
 ERR_NODIR=1
 ERR_NONAME=2
 VERBOSE=0
+DEBUG=0
 
 
 # An error function
@@ -59,7 +60,7 @@ err() {
 
 # Return actual path from something
 modpath() {
-printf ''	
+	printf ''	
 }
 
 # A usage function
@@ -279,19 +280,17 @@ do
 			DATASOURCE="$1"	
 		;;
 
-		-v|--verbose)	
-			# Verbose
-			VERBOSE=1
-		;;
+		-v|--verbose)	VERBOSE=1 ;;
 
-		--help)	
-			usage 0
-		;;
+		-x)	DEBUG=1 ;;
 
-		--)	break
-		;;
+		--help)	usage 0 ;;
 
-		-*)	printf "$PROGRAM_NAME: Unknown argument received: $1\n" > /dev/stderr; usage 1
+		--)	break ;;
+
+		-*)	
+		printf "$PROGRAM_NAME: Unknown argument received: $1\n" > /dev/stderr
+		usage 1
 		;;
 	esac
 	shift
@@ -301,6 +300,8 @@ done
 # Check the $CONF_FILE for either file:// or http://
 REPO_FETCH_CMD=
 REPO_LIST_CMD=
+
+[ $VERBOSE -eq 1 ] && printf "Loading $CONF_FILE\n" >/dev/stderr
 source $CONF_FILE
 test -z "$REPO_PATH" && err "No repository path specified in $CONF_FILE" 1
 
@@ -321,9 +322,28 @@ fi
 # choose between --install and --extract
 if [ $DO_INSTALL -eq 1 ] 
 then
-	FOLDER=$TOPATH
+	#FOLDER=$TOPATH
+	FOLDER=
 	test ! -z "$FROMPATH" && MODPATH=$FROMPATH
-	#echo $FOLDER $MODPATH
+
+	# Check if the directory is resolvable using htdocs & (domain or name)
+	[ $DEBUG -eq 1 ] && echo stat $HTTPD_PREFIX/$TOPATH
+	stat $HTTPD_SRVDIR/$TOPATH >/dev/null 2>/dev/null && {
+		FOLDER=$HTTPD_SRVDIR/$TOPATH
+	}
+
+	# Otherwise, maybe check the current directory?
+	test -z "$FOLDER" && {
+		stat $TOPATH >/dev/null 2>/dev/null && {
+			FOLDER=$TOPATH
+		}
+	}
+
+	# Let me know what happened..
+	[ $DEBUG -eq 1 ] && {
+		echo Current instance folder is: $FOLDER 
+		echo Module path is: $MODPATH
+	}
 fi
 
 
@@ -339,7 +359,7 @@ fi
 if [ ! -z "$FOLDER" ] 
 then
 	FOLDER=`realpath $FOLDER`
-	echo $FOLDER
+	[ $DEBUG -eq 1 ] && echo $FOLDER
 fi
 
 
@@ -495,8 +515,9 @@ then
 
 	# Assume that this is from a disk 
 	else
-		[ $VERBOSE -eq 1 ] && printf "Copy from disk: $MODPATH\n"
+		[ $VERBOSE -eq 1 ] && printf "Copy from disk: $MODPATH\n" >/dev/stderr
 
+		[ $DEBUG -eq 1 ] && printf "stat $MODPATH/$MODNAME >/dev/null 2>/dev/null" > /dev/stderr 
 		stat $MODPATH/$MODNAME >/dev/null 2>/dev/null || {
 			err "Module '$MODNAME' at $MODPATH not found..."
 		}
