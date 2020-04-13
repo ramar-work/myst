@@ -118,15 +118,23 @@ build:
 		cd vendor/$(HTTPDV)/ && \
 			./configure \
 				--enable-static-support \
-				--enable-mpms-shared=all \
 				--with-apr=$$FULL_LP \
 				--with-apr-util=$$FULL_LP \
 				--prefix=$(PREFIX)/httpd && \
 			make
 
 
-# retrieve-lucee: Get the most current version of Lucee from the web. 
+# retrieve-lucee: Get a working stable version of Lucee
+# https://cdn.lucee.org/lucee-5.3.4.080-pl0-linux-x64-installer.run
 retrieve-lucee:
+	FULL_LP=`realpath $(LP)` && \
+	wget -O "/$$FULL_LP/lucee.run" https://cdn.lucee.org/lucee-5.3.4.080-pl0-linux-x64-installer.run && \
+	chmod +x "/$$FULL_LP/lucee.run"
+
+
+# retrieve-lucee: Get the most current version of Lucee from the web.
+# Script seems to be broken on the latest changes to the website.
+retrieve-lucee-deprecated:
 	FULL_LP=`realpath $(LP)` && \
 	DLOUT=$$( wget -O - $(LUCEE_WWW_DOWNLOAD_HOME) 2>/dev/null | \
 		grep $(LUCEE_WWW_CHECKSTRING) | \
