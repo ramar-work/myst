@@ -39,6 +39,7 @@ TOMCAT_MAX_HEAP=2048
 TOMCAT_CONFIG=$(LP)/tomcat.key
 
 #All the Apache stuff is here
+TEST_PROJECT=faux.local
 FILE_BASE=./share/mystinstall
 HTTPD_PREFIX=$(PREFIX)/httpd
 HTTPD_LIBDIR=$(HTTPD_PREFIX)/modules
@@ -201,12 +202,12 @@ bin-install:
 # http-test-install: install an HTTP test project
 http-test-install:
 	sed -e "{ \
-		s/@@SITEDOMAIN@@/taggart.local/; \
-		s/@@SITENAME@@/taggart.local/; \
-		s/@@ALIASDOMAIN@@/taggarthttp.local/; \
+		s/@@SITEDOMAIN@@/$(TEST_PROJECT)/; \
+		s/@@SITENAME@@/$(TEST_PROJECT)/; \
+		s/@@ALIASDOMAIN@@/$(TEST_PROJECT)/; \
 		s;@@WWWROOT@@;$(HTTPD_SRVDIR);; \
-	}" $(FILE_BASE)/../default.vhost > $(HTTPD_CONFDIR)/extra/vhosts/taggart.local.conf
-	cp -r $(FILE_BASE)/taggart.local $(HTTPD_SRVDIR)/
+	}" $(FILE_BASE)/../default.vhost > $(HTTPD_CONFDIR)/extra/vhosts/$(TEST_PROJECT).conf
+	cp -r $(FILE_BASE)/$(TEST_PROJECT) $(HTTPD_SRVDIR)/
 
 
 # https-test-install: install an HTTPS test project
