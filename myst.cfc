@@ -1,4 +1,4 @@
-void /* --------------------------------------------------
+/* --------------------------------------------------
 myst.cfc
 ========
 
@@ -93,6 +93,17 @@ name="Myst"
 accessors=true 
 {
 
+	//Consider extending here... and set defaults here...
+
+	//Cookie key name for grabbing stuff out of structs
+	property name="cookie" type="string" default="45d3b6e15e31a72dbdd0ac12672f397d5b9cd959cc348d16b716b2412880";
+
+	//Control debugging
+	property name="debug" type="boolean" default="false";
+
+	//The datasource that will be used during the life of the app.
+	property name="datasource" type="string";
+
 	//TODO: This should be a property accessible by everything
 	property name="compName" type="string" default="Myst";
 
@@ -101,9 +112,6 @@ accessors=true
 
 	//Test mode
 	property name="apiAutodie" type="boolean" default=1;
-
-	//The datasource that will be used during the life of the app.
-	property name="datasource" type="string";
 
 	//The 'manifest' value that is loaded at the beginning of starting a Myst app
 	property name="appdata"; 
@@ -147,7 +155,6 @@ accessors=true
 	property name="contentOn404" type="string" default="File not found."; 
 	property name="contentOn410" type="string" default="Authentication denied."; 
 	property name="contentOn500" type="string" default="Error occurred."; 
-	property name="selectedContentType" type="string" default="text/html"; 
 
 	//property name="logString" type="struct";
 	property name="logStyle" type="string" default="standard"; //combined, common,
@@ -162,7 +169,7 @@ accessors=true
 	property name="pageStatus" type="number" default=200;
 	property name="pageStatusMessage" type="string" default="";
 	property name="pageMessage" type="string" default="";
-	property name="pageError" default="";
+	property name="pageError"; 
 	property name="pageErrors" default="";
 	property name="pageErrorExtractors" default="detail,message,type"; /*tagContext,stackTrace*/
 	property name="components" type="struct";
@@ -172,6 +179,8 @@ accessors=true
 	property name="headers" type="struct";
 	property name="defaultModelKey" type="string" default="model";
 	property name="defaultErrorKey" type="string" default="error";
+
+	property name="defaultContentType" type="string" default="text/html";
 
 	/*DEPRECATE THESE?*/
 	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
@@ -539,8 +548,8 @@ accessors=true
 		if ( !match ) {
 			return {
 				status = false
-			, message = "Requested inclusion of a file not in the web directory."
-			, errors = {}
+			, error = "Requested inclusion of a file not in the web directory."
+			, exception  = {}
 			, ref = ""
 			};
 		}
@@ -550,28 +559,24 @@ accessors=true
 		
 		//Include the page and make it work
 		try {
+			//The content should be wrapped and returned...
 			include ref; 
 		}
 		catch (any e) {
-			//define the type of exception here and wrap that.  or just return it and
-			//wrap it from the calling function
-			//writeoutput( e.type );	
-			//writedump( e );
-			//abort;
-
 			return {
 				status = false
-			 ,message = "#getCompName()# caught a '#e.type#' exception."
-			 ,errors = e
+			 ,error = "#getCompName()# caught a '#e.type#' exception when trying to include file #ref#"
+			 ,exception = e
 			 ,ref = ref 
 			}
 		}
 
 		return {
 			status = true
-		 ,message = "SUCCESS"
-		 ,errors = {}
+		 ,error = "Success loading file #ref#."
+		 ,exception = {}
 		 ,ref = ref 
+		 ,results = ref 
 		}
 	}
 
@@ -1022,6 +1027,7 @@ accessors=true
 
 	}
 
+
 	/** RESPONSE **
  * --------------------------------------------------------------------- */
 
@@ -1354,16 +1360,20 @@ abort;
 				ArrayAppend( pgArray, { type=ev.type, value=ev.value } );
 				//writedump( 'got #ev.type# at model.' );
 			}
+			/*
 			else if ( ev.type == 'struct' ) {
-				//renderPage(500, "Models as structs are not yet supported (check key at #rd.file#).");
-				/*
-				//check for 'exec' and just save that string, only exec is allowed right now
-				if ( StructKeyExists( ev.value, "exec" ) ) 
-					ArrayAppend(pgArray, {type="execution",value=ev.value.exec});
+				if ( StructKeyExists( ev.value, "exec" ) ) {
+					ArrayAppend(pgArray, { type="execution",value=ev.value.exec })
 				else {
-					renderPage(500,"Model struct does not contain 'exec' key (check key at #rd.file#)");
+					return {
+						status = false,
+						error = "Model at key '?' does not contain key 'execute'",
+						exception = {}
+					}
 				}
-				*/
+			}
+			*/
+			else if ( ev.type == 'struct' ) {
 				return {
 					status = false,
 					error = "Models as structs are not yet supported (check key at #rd.file#).",
@@ -1423,7 +1433,8 @@ abort;
 						//renderPage(500, "Could not locate model file '#page.value#'" );
 						return {
 							status = false,
-							error = "Could not locate model file '#page.value#'",
+							error = "Could not locate requested model file " &
+								"'#page.value#.cf[cm]' for key 'default'",
 							exception = {}
 						}
 					}
@@ -1704,13 +1715,25 @@ abort;
 		if ( StructKeyExists( routedata, "scope" ) ) {
 			logReport( "Evaluating key 'scope' @ /#data.page#..." );
 			logReport( "SUCCESS!" );
-			return routedata.scope;
+			return {
+				status = true,
+				results = routedata.scope
+			}
 		}
-		return StructNew();
+		return {
+			status = true,
+			keyNotFound = true,
+			results = routedata.scope
+		}
 	}
 
-	private struct function evaluateReturnsKey( Struct routedata ) {
-		if ( StructKeyExists( routedata, "returns" ) ) {
+	private struct function evaluateReturnsKey( Struct routedata, Struct appdata ) {
+
+		//Check for key first in routedata, and then appdata
+		var r = StructKeyExists( routedata, "returns" ) ? routedata.returns :
+			StructKeyExists( appdata, "returns" ) ? appdata.returns : false;	
+
+		if ( r && r.getType() == 'string' ) {
 			logReport( "Evaluating key 'returns' @ /#data.page#..." );
 			//Check if it's supported
 			if ( getType( routedata.returns ).type neq "string" ) {
@@ -1728,13 +1751,17 @@ abort;
 					exception = {}
 				}
 			}
-			setSelectedContentType( routedata.returns );	
+			//setSelectedContentType( routedata.returns );	
 			logReport( "SUCCESS!" );
 			return {
-				value = routedata.returns
+				status = true,
+				results = routedata.returns
 			}
 		}
-		return StructNew();
+		return {
+			status = true,
+			results = getDefaultContentType()
+		}
 	}
 
 	private struct function generateLogFmt( Required String key, Required String page ) {
@@ -1811,7 +1838,7 @@ abort;
 					var content = "This endpoint expected variables it did not receive.";
 					//TODO: If no err and status is greater than 399, type is 'custom', detail, I dunno...
 					//renderPage( status=412, content=content, err={ message=content,detail="",type="" } );
-					renderPage(412, content, err={ message=content,detail="",type="" } );
+					//renderPage(412, content, err={ message=content,detail="",type="" } );
 					return {
 						status = false,
 						error = "This endpoint expected variables it did not receive.",
@@ -1837,23 +1864,20 @@ abort;
 		return { status = true };	
 	}
 
-	private function evaluateModelKey( Struct routedata ) {
+	private struct function evaluateModelKey( Struct routedata ) {
 		logReport( "Evaluating models @ #routedata.name#" );
-		
 		//This is where rethinking things could help, scope should be another argument.
 		if ( StructKeyExists( routedata, "model" ) ) {
 			//The status should return here, and errors handled
-			model = evalModel( routedata.model );	
-
-			//The models could dump out here... depending on how one wants to run it...
-			//writedump( returnAsJson( model ) ); abort;
-			//writedump( model ); abort;	
+			var model = evalModel( routedata.model );	
+			return model;
 		}
+
+		return { status = true }
 
 	}
 
 	private function evaluateFilterKey( Struct routedata ) {
-		
 		//Filter out the scope when returning JSON
 		if ( StructKeyExists( routedata, "filter" ) ) {
 			//Get the right variable from the scope and stop
@@ -1870,16 +1894,15 @@ abort;
 		}
 	}
 
-	private function evaluateViewKey( Struct routedata ) {
+	private function evaluateViewKey( Struct routedata, string type ) {
 		//Run a view
 		//var the_page_content;
-		if ( !StructKeyExists( routedata, "view" ) ) 
-			setContent( model );
-		else {
+		if ( StructKeyExists( routedata, "view" ) ) { 
 			//Check the type and serialize...
 			logReport( "Evaluating views @ /#data.page#..." );
-			the_page_content = evalView( routedata );
-			setContent( evalView( routedata ) );
+			//return evalView( routedata );
+			//setContent( evalView( routedata ) );
+			return { status = true };	
 		}
 		/*
 		else {
@@ -1889,7 +1912,7 @@ abort;
 			setContent( model );
 		}
 		*/
-		
+		return { status = true, keyNotFound = true };	
 	}
 
 	private function evaluateAfterKey( Struct routedata ) {
@@ -1902,6 +1925,12 @@ abort;
 		}
 
 		//Render the final payload...
+	}
+
+
+	private function dieOnFail( c ) {
+		writedump( c );
+		abort;
 	}
 
 
@@ -1927,11 +1956,29 @@ abort;
 		variables.data = MystInstance.app;
 		//variables.db = MystInstance.app.data;
 
+		//Use this to hold status of things that are wrong
+		var tmp;
+
+		//Invoke this to maintain some control over the environment 
+		var ctx = new std.components.ctx();
+
+		//Invoke this to prepare the body and get ready to do something with it
+		var res = new std.components.response(); 
+
+		//Invoke this to load data.cfc. (TODO: Run depending on config settings)
+		//var data = new data(); 
+		
+		//Invoke this to load error handling
+		var error = new std.components.error( res, MystInstance );
+		setPageError( error );
+
 		//Load all of the components here
-		var d = loadComponents( MystInstance.app );
+		ctx.components = loadComponents( MystInstance.app );
+writedump( ctx.components );
 
 		//Route injection should happen here.
 		var r = appendIndependentRoutes( MystInstance.app );
+writedump(r);
 
 		//This ought to return a machine code friendly struct with route eval data
 		//evaluateRoutingTable( appdata.routes, {} );
@@ -1940,48 +1987,79 @@ abort;
 		//renderPage( 500, "Error rebuilding route index.", e );
 
 		//Get the mapped route (handle sending back here) 
-		var rd = findMappedRoute( MystInstance.app.routes );
-writedump( rd );
+		ctx.route = findMappedRoute( MystInstance.app.routes );
+writedump( ctx.route );
 
-		//The scope should carry things over...
-		var scope = evaluateScopeKey( rd );
-writedump( scope );
-
-		//returns
-		var content_type = evaluateReturnsKey( rd );
-writedump( content_type );
-		//before
-		var before = evaluateBeforeKey( rd );
-writedump( before );
-		//accepts
-		if ( !(a = evaluateAcceptsKey( rd )).status ) {
-			renderPage( status=405, content=a.error );
-		}
-writedump( a );
-		//expects
-		var b = evaluateExpectsKey( rd );
-writedump( b );
-		//query
-		var c = evaluateQueryKey( rd );
-		//model
-		var model = evaluateModelKey( rd );	
 /*
-		//filter
-		//evaluateFilterKey( rd );
-		//view
-		var viewContent = evaluateViewKey( rd );
-		//after
+writedump( error.render( { error="an error.", message="nothing", status=false} ) );
+abort;
 */
 
-		//Rendering the final payload ought to take place here somewhere...
-		//Let's just pass around strings though... b/c everything else doesn't seem to
-		//work too well
-abort;
+		//The scope should carry things over...
+		//if ( !( tmp = evaluateScopeKey( ctx.route ) ).status )
+			 
+		//returns
+		if ( ( tmp = evaluateReturnsKey( ctx, MystInstance.app ) ).status )
+			res.setContentType( tmp.results );
+		else {
+			dieOnFail( tmp );
+			this.render( 500, error.render(model));
+		}
+
+		//before
+		tmp = evaluateBeforeKey( ctx.route );
+		//If this does not exist, move on, if it fails, stop, if it succeeds, add to ctx 
+
+		//accepts
+		if ( !(tmp = evaluateAcceptsKey( ctx.route )).status ) {
+			//method not accepted, or some other expectation failed... 
+			//renderPage( status=405, content=tmp.error );
+			this.render( 405, error.render(model));
+		}
+
+		//expects
+		if ( !(tmp = evaluateExpectsKey( ctx.route ) ).status ) {
+			//expected certain variables that we didn't get
+			this.render( 400, error.render(model));
+		}
+
+		//query
+		if ( !(tmp = evaluateQueryKey( ctx.route ) ).status ) {
+			//always going to be a 500, error could be anything though...
+			this.render( 500, error.render(model));
+		}
+
+		//model
+		var model = evaluateModelKey( ctx.route );	
+
+		//If this is the case, the thing needs to die
+		if ( !model.status ) {
+			//A 500 will most likely always be the case.
+			//Needs to be come an error, but based on content type
+			//this.render( 500, createObject("std.components.error", model ) );
+			this.render( 500, error.render(model));
+		}
 
 
+		//filter
+		//evaluateFilterKey( ctx.route );
+
+		//Better not to use an if statement here...
+		//
+		//
+
+		if ( res.getContentType() ) {
+			this.render( 200, res.getContentType(), model );
+		}
+	
+		//view
+		var viewContent = evaluateViewKey( ctx, res.getContentType()  );
+		//after
+		//evaluateAfterKey( ctx );
 
 		//var rp = renderPage( status=200, content=the_page_content );
 logReport( "before render page..." );
+/*
 		var rp = renderPage( 200, getContent() );
 		if ( rp.status )
 			return 1;
@@ -1989,9 +2067,24 @@ logReport( "before render page..." );
 			return 0;
 		}
 logReport( "end of session, for real." );
+*/
 abort;
 	}
 
+
+	private struct function explodeError( struct model ) {
+		if ( StructKeyExists( model, "exception" ) && !StructIsEmpty( model.exception ) ) {
+			//The error class could be invoked instead...
+			var me = model.exception
+			if ( StructKeyExists( me, "TagContext" ) ) {
+				model.line = me.TagContext[1].line;
+				model.column = me.TagContext[1].column;
+				model.dump = me.TagContext[1].codePrintHTML;
+				model.trace = me.StackTrace;
+			}	
+		}
+		return model;
+	}
 
 	/*
 	private struct function findResource ( Required String name, Required Struct rl ) {
@@ -2675,6 +2768,28 @@ abort;
 		return this;
 	}
 
+	//Return a message
+	public boolean function render( numeric status, struct content ) {
+		//If status is invalid, return a failure
+		if ( !status || status < 100 || status > 599 ) {
+			status = 500;
+			//can be recursive
+		}
+
+		//Just return something for each of the formats
+		//When debugging, it ought to stop
+		//writedump( content );
+		//text/json
+		//text/xml
+		//text/html
+		//var content = _include( "std", "5xx-error" );
+
+		//text/plain
+		//custom?
+		//else?
+		//writedump( content ); abort;
+		return false;
+	} 
 	/*------------- DEPRECATED --------------------- */
 	//@title: wrapError 
 	//@args :
@@ -2687,5 +2802,9 @@ abort;
 		return myRes;
 	}
 	/*------------- DEPRECATED --------------------- */
+	//Make a variable global, so that it can be accessed somewhere else
+	public void function setGlobal( v ) {
+		
+	}
 }
 
