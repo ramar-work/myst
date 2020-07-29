@@ -560,7 +560,9 @@ accessors=true
 		//Include the page and make it work
 		try {
 			//The content should be wrapped and returned...
+			savecontent variable="content" {
 			include ref; 
+			}
 		}
 		catch (any e) {
 			return {
@@ -576,7 +578,7 @@ accessors=true
 		 ,error = "Success loading file #ref#."
 		 ,exception = {}
 		 ,ref = ref 
-		 ,results = ref 
+		 ,results = content 
 		}
 	}
 
@@ -1260,14 +1262,6 @@ abort;
 	}
 
 
-	private function evalBefore( Required Struct r ) {
-
-	}
-
-	private function evalAfter( Required Struct r ) {
-
-	}
-
 	//Intended to be called inside cfm files....
 	//kind of a quick and dirty way to do typeless models... 
 	public function setScope ( Required String name, Required value, String type ) {
@@ -1412,9 +1406,6 @@ abort;
 			for ( var page in pgArray ) {
 				if ( page.type == "string" ) {
 					var path = "#getRootDir()#app/#page.value#";
-writedump(FileExists(path&".cfc"));
-writedump(FileExists(path&".cfm"));
-writedump(path);abort;
 					if ( FileExists( "#path#.cfc" ) ) {
 						result[ page.value ] = createObject( "component", "app.#page.value#" ).init( this );
 					}
@@ -1495,34 +1486,21 @@ writedump(path);abort;
 	 *
 	 * Evaluates a view.
 	 */
-	private String function evalView( Required Struct rd ) {
+	private struct function evalView( Required Struct rd, Struct modeldata ) {
 		logReport( "Evaluating views..." );
-		//Evaluate view
+		//Evaluate a single view
 		try {
-			if ( !StructKeyExists( rd, "view" ) ) {
-				renderPage( 
-					status=500
-				, content="View was requested, but there are no views specified for the endpoint at '#rd.file#'"
-				, err={ 
-						type="framework",
-						message= "View was requested, but there are no views specified for the endpoint at '#rd.file#'"
-					}
-				);
-			}
-
 			var the_page_content;
 			savecontent variable="the_page_content" {
 				//Get the type name
 				var ev = getType( rd.view );
 				//Custom message is needed here somewhere...
 				if ( ev.type != "string" && ev.type != "array" ) {
-					renderPage(500, "View value for '#rd.file#' was not a string or array.", {});
-					/*
-						status=500
-					, err={} 
-					, content="View value for '#rd.file#' was not a string or array."
-					);
-					*/
+					return {
+						status = false,
+						error = "View value for '#rd.file#' was not a string or array.",
+						exception = {} 
+					}
 				}
 
 				//Set pageArray if it's string or array
@@ -1532,13 +1510,8 @@ writedump(path);abort;
 				for ( var x in pageArray ) {
 					var cs = _include( where="views", name=x );
 					if ( !cs.status ) {
-						renderPage(500,"Error loading view at page '#x#'.",cs.errors);
-						/*
-							status=500
-						, err=callStat.errors 
-						, content="Error loading view at page '#x#'."
-						);
-						*/
+						//renderPage(500,"Error loading view at page '#x#'.",cs.errors);
+						return cs;
 					}
 				}
 			}
@@ -1546,10 +1519,17 @@ writedump(path);abort;
 		catch (any e) {
 			//Manually wrap the error template here.
 			//renderPage( status=500, err=e, content="Error in parsing view." );
-			renderPage(500, "Error in parsing view.", e );
+			return {
+				status = false,
+				error = "Error in parsing view for '#rd.file#'.",
+				exception = e 
+			}
 		}
 
-		return the_page_content;
+		return {
+			status = true,
+			results = the_page_content
+		}
 	}
 
 
@@ -1897,16 +1877,18 @@ writedump(path);abort;
 		}
 	}
 
-	private function evaluateViewKey( Struct routedata, string type ) {
+	private function evaluateViewKey( Struct routedata, Struct modeldata ) {
 		//Run a view
-		//var the_page_content;
-		if ( StructKeyExists( routedata, "view" ) ) { 
+		if ( StructKeyExists( routedata, "view" ) ) {
 			//Check the type and serialize...
-			logReport( "Evaluating views @ /#data.page#..." );
-			//return evalView( routedata );
+			logReport( "Evaluating views @ #routedata.name#..." );
+//writedump( routedata ); writedump(modeldata); abort;
+			return evalView( routedata, modeldata );
 			//setContent( evalView( routedata ) );
-			return { status = true };	
+			//return { status = true };	
 		}
+		return { status = true, keyNotFound = true };	
+	}
 		/*
 		else {
 			//getScope and search for type of what was wanted
@@ -1915,8 +1897,6 @@ writedump(path);abort;
 			setContent( model );
 		}
 		*/
-		return { status = true, keyNotFound = true };	
-	}
 
 	private function evaluateAfterKey( Struct routedata ) {
 		
@@ -1985,11 +1965,12 @@ writedump(path);abort;
 
 		//Load all of the components here
 		ctx.components = loadComponents( MystInstance.app );
-writedump( ctx.components );
+		//You need to catch these too	
+		//writedump( ctx.components );
 
-		//Route injection should happen here.
+		//Route injection happens here.
 		var r = appendIndependentRoutes( MystInstance.app );
-writedump(r);
+		//writedump(r);
 
 		//This ought to return a machine code friendly struct with route eval data
 		//evaluateRoutingTable( appdata.routes, {} );
@@ -1999,7 +1980,7 @@ writedump(r);
 
 		//Get the mapped route (handle sending back here) 
 		ctx.route = findMappedRoute( MystInstance.app.routes );
-writedump( ctx.route );
+		//writedump( ctx.route );
 
 		//The scope should carry things over...
 		//if ( !( tmp = evaluateScopeKey( ctx.route ) ).status )
@@ -2008,7 +1989,7 @@ writedump( ctx.route );
 		if ( ( tmp = evaluateReturnsKey( ctx, MystInstance.app ) ).status )
 			res.setContentType( tmp.results );
 		else {
-			return this.render( 500, error.render( tmp ));
+			return this.respondWith( 500, tmp );
 		}
 
 		//before
@@ -2016,63 +1997,49 @@ writedump( ctx.route );
 		if ( ( ctx.before = evaluateBeforeKey( ctx.route ) ).status )
 			ctx.before = this.extractResults( ctx.before );
 		else {
-			return this.render( 500, error.render( ctx.before ));
+			return this.respondWith( 500, ctx.before );
 		}
 
 		//method not accepted, or some other expectation failed... 
 		if ( !(ctx.accepts = evaluateAcceptsKey( ctx.route )).status ) {
-			return this.render( 405, error.render( ctx.accepts ));
+			return this.respondWith( 405, ctx.accepts );
 		}
 
 		//expected certain variables that we didn't get
 		if ( !(ctx.expects = evaluateExpectsKey( ctx.route ) ).status ) {
-			return this.render( 400, error.render( ctx.expects ));
+			return this.respondWith( 400, ctx.expects );
 		}
 
 		//If the query was successful, a response should be sent here.
 		if ( !(ctx.query = evaluateQueryKey( ctx.route ) ).status )
-			return this.render( 500, error.render( ctx.query ));
+			return this.respondWith( 500, ctx.query );
 		else if ( StructKeyExists( ctx.query, "results" ) ) {
 			ctx.query = this.extractResults( ctx.query );
-			return this.render( 200, ctx.query );
+			return this.respondWith( 200, ctx.query );
 		}
 		
 		//Check the model
 		if ( !(ctx.model = evaluateModelKey( ctx.route )).status )
-			return this.render( 500, error.render( ctx.model ) );
+			return this.respondWith( 500, ctx.model );
 
 		//Filter: Optional for now, but will extract certain keys
 		//if ( !(ctx.filter = evaluateFilterKey( ctx.route )).status )
-		//	this.render( 500, error.render( ctx.filter ) );
+		//	this.respondWith( 500, error.render( ctx.filter ) );
 
 		//View interpretation can fail
-		if ( !(ctx.view = evaluateViewKey( ctx.route, res.getContentType() )) )
-			return this.render( 500, error.render( ctx.view ) );
-
-		//after
-		//evaluateAfterKey( ctx );
-
-		//Everything has been run, and Myst successfully reached the end of the request
-		//So now, time to send the content to somebody,
-		//Feeling like the context should be passed in (or the response)
-		//Or both
-		//if the ctx is passed in, then extracting elements from model gets easy
-writedump( ctx );
-
-		//this.render( 200, res.getContentType(), model );
-	
-		//var rp = renderPage( status=200, content=the_page_content );
-logReport( "before render page..." );
-/*
-		var rp = renderPage( 200, getContent() );
-		if ( rp.status )
-			return 1;
+		if ( !(ctx.view = evaluateViewKey( ctx.route, ctx.model.results )).status )
+			return this.respondWith( 500, ctx.view );
+		else if ( ctx.view.status && StructKeyExists( ctx.view, "results" ) )
+			return this.respondWith( 200, ctx.view.results );
 		else {
-			return 0;
+			//No view, and this is supposed to be the case
+			//after
+			//evaluateAfterKey( ctx );
+			return this.respondWith( 200, ctx.model.results );
 		}
-logReport( "end of session, for real." );
-*/
-abort;
+
+		//There is absolutely no reason to end up here.  Ever.
+		return true;
 	}
 
 
@@ -2698,26 +2665,38 @@ abort;
 	}
 
 
+	//Handles rendering error messages according to the type of content
+	public string function render( struct content ) {
+		if ( this.response.getContentType() == "application/json" )
+			return SerializeJSON( content ); 
+		else if ( this.response.getContentType() == "text/xml" )
+			return SerializeXML( content ); 
+		else {
+			return content.results;
+		}
+	}
+
+
+
 	//Return a message
-	public boolean function render( numeric status, struct content ) {
+	public boolean function respondWith( numeric status, struct con ) {
+		//A String buffer goes here... not sure how fast this is...
+		var contentBuffer;
+
 		//If status is invalid, return a failure
 		if ( !status || status < 100 || status > 599 ) {
-			status = 500;
-			//can be recursive
+			contentBuffer = "Attempted to return invalid code #status#";
 		}
-
-		//Just return something for each of the formats
-		//When debugging, it ought to stop
-		//writedump( content );
-		//text/json
-		//text/xml
-		//text/html
-		//var content = _include( "std", "5xx-error" );
-
-		//text/plain
-		//custom?
-		//else?
-		//writedump( content ); abort;
+		else if ( StructKeyExists( con, "status" ) && !con.status ) {
+			var error = getPageError();
+			error.setStatus( status );
+			error.setStatusMessage( getHttpHeaders()[ status ] );
+			contentBuffer = error.render( con ); 
+		}
+		else {
+			contentBuffer = this.render( con );
+		}
+		this.sendResponse( status, "text/html", contentBuffer );
 		return true;
 	} 
 
