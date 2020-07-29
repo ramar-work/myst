@@ -298,7 +298,7 @@ accessors=true
 				var d = DateTimeFormat( Now(), "EEEE mmmm d, yyyy HH:NN:SS tt" );
 				var logMessage = "#id#: [#d# EST] #arguments.message#" & Chr(10) & Chr(13);
 				var m = FileAppend( getLogFile(), logMessage );
-				writeoutput( logMessage );
+				//writeoutput( logMessage );
 				//writedump(m); abort;
 			//'127.0.0.1 - - [#DateFormat()#] "#cgi.request_method# #cgi.path_info# HTTP/1.1" status content-size'
 			}
@@ -1412,6 +1412,9 @@ abort;
 			for ( var page in pgArray ) {
 				if ( page.type == "string" ) {
 					var path = "#getRootDir()#app/#page.value#";
+writedump(FileExists(path&".cfc"));
+writedump(FileExists(path&".cfm"));
+writedump(path);abort;
 					if ( FileExists( "#path#.cfc" ) ) {
 						result[ page.value ] = createObject( "component", "app.#page.value#" ).init( this );
 					}
@@ -1790,7 +1793,7 @@ abort;
 			//Get the type of routedata.before
 			logReport( "SUCCESS!" );
 		}
-		return StructNew();
+		return { status = true };
 	}
 
 	private struct function evaluateAcceptsKey( Struct routedata ) {
@@ -1934,6 +1937,14 @@ abort;
 	}
 
 
+	//Return just the result set when a call was successful.
+	private function extractResults( struct data ) {
+		if ( data.status && StructKeyExists( data, "results" ) ) {
+			return data.results;	
+		}
+		return data;
+	}
+
 	/**
 	 * makeIndex( Myst mystInstance )
 	 *
@@ -1990,11 +2001,6 @@ writedump(r);
 		ctx.route = findMappedRoute( MystInstance.app.routes );
 writedump( ctx.route );
 
-/*
-writedump( error.render( { error="an error.", message="nothing", status=false} ) );
-abort;
-*/
-
 		//The scope should carry things over...
 		//if ( !( tmp = evaluateScopeKey( ctx.route ) ).status )
 			 
@@ -2002,61 +2008,59 @@ abort;
 		if ( ( tmp = evaluateReturnsKey( ctx, MystInstance.app ) ).status )
 			res.setContentType( tmp.results );
 		else {
-			dieOnFail( tmp );
-			this.render( 500, error.render(model));
+			return this.render( 500, error.render( tmp ));
 		}
 
 		//before
-		tmp = evaluateBeforeKey( ctx.route );
 		//If this does not exist, move on, if it fails, stop, if it succeeds, add to ctx 
-
-		//accepts
-		if ( !(tmp = evaluateAcceptsKey( ctx.route )).status ) {
-			//method not accepted, or some other expectation failed... 
-			//renderPage( status=405, content=tmp.error );
-			this.render( 405, error.render(model));
+		if ( ( ctx.before = evaluateBeforeKey( ctx.route ) ).status )
+			ctx.before = this.extractResults( ctx.before );
+		else {
+			return this.render( 500, error.render( ctx.before ));
 		}
 
-		//expects
-		if ( !(tmp = evaluateExpectsKey( ctx.route ) ).status ) {
-			//expected certain variables that we didn't get
-			this.render( 400, error.render(model));
+		//method not accepted, or some other expectation failed... 
+		if ( !(ctx.accepts = evaluateAcceptsKey( ctx.route )).status ) {
+			return this.render( 405, error.render( ctx.accepts ));
 		}
 
-		//query
-		if ( !(tmp = evaluateQueryKey( ctx.route ) ).status ) {
-			//always going to be a 500, error could be anything though...
-			this.render( 500, error.render(model));
+		//expected certain variables that we didn't get
+		if ( !(ctx.expects = evaluateExpectsKey( ctx.route ) ).status ) {
+			return this.render( 400, error.render( ctx.expects ));
 		}
 
-		//model
-		var model = evaluateModelKey( ctx.route );	
-
-		//If this is the case, the thing needs to die
-		if ( !model.status ) {
-			//A 500 will most likely always be the case.
-			//Needs to be come an error, but based on content type
-			//this.render( 500, createObject("std.components.error", model ) );
-			this.render( 500, error.render(model));
+		//If the query was successful, a response should be sent here.
+		if ( !(ctx.query = evaluateQueryKey( ctx.route ) ).status )
+			return this.render( 500, error.render( ctx.query ));
+		else if ( StructKeyExists( ctx.query, "results" ) ) {
+			ctx.query = this.extractResults( ctx.query );
+			return this.render( 200, ctx.query );
 		}
+		
+		//Check the model
+		if ( !(ctx.model = evaluateModelKey( ctx.route )).status )
+			return this.render( 500, error.render( ctx.model ) );
 
+		//Filter: Optional for now, but will extract certain keys
+		//if ( !(ctx.filter = evaluateFilterKey( ctx.route )).status )
+		//	this.render( 500, error.render( ctx.filter ) );
 
-		//filter
-		//evaluateFilterKey( ctx.route );
+		//View interpretation can fail
+		if ( !(ctx.view = evaluateViewKey( ctx.route, res.getContentType() )) )
+			return this.render( 500, error.render( ctx.view ) );
 
-		//Better not to use an if statement here...
-		//
-		//
-
-		if ( res.getContentType() ) {
-			this.render( 200, res.getContentType(), model );
-		}
-	
-		//view
-		var viewContent = evaluateViewKey( ctx, res.getContentType()  );
 		//after
 		//evaluateAfterKey( ctx );
 
+		//Everything has been run, and Myst successfully reached the end of the request
+		//So now, time to send the content to somebody,
+		//Feeling like the context should be passed in (or the response)
+		//Or both
+		//if the ctx is passed in, then extracting elements from model gets easy
+writedump( ctx );
+
+		//this.render( 200, res.getContentType(), model );
+	
 		//var rp = renderPage( status=200, content=the_page_content );
 logReport( "before render page..." );
 /*
@@ -2085,6 +2089,7 @@ abort;
 		}
 		return model;
 	}
+
 
 	/*
 	private struct function findResource ( Required String name, Required Struct rl ) {
@@ -2276,7 +2281,6 @@ abort;
 		//You probably found nothing, so either do 404 or some other stuff.
 		return ToString(0);
 	}
-
 
 
 	//Return formatted error strings
@@ -2694,6 +2698,29 @@ abort;
 	}
 
 
+	//Return a message
+	public boolean function render( numeric status, struct content ) {
+		//If status is invalid, return a failure
+		if ( !status || status < 100 || status > 599 ) {
+			status = 500;
+			//can be recursive
+		}
+
+		//Just return something for each of the formats
+		//When debugging, it ought to stop
+		//writedump( content );
+		//text/json
+		//text/xml
+		//text/html
+		//var content = _include( "std", "5xx-error" );
+
+		//text/plain
+		//custom?
+		//else?
+		//writedump( content ); abort;
+		return true;
+	} 
+
 	/**
 	 * init()
 	 *
@@ -2768,28 +2795,6 @@ abort;
 		return this;
 	}
 
-	//Return a message
-	public boolean function render( numeric status, struct content ) {
-		//If status is invalid, return a failure
-		if ( !status || status < 100 || status > 599 ) {
-			status = 500;
-			//can be recursive
-		}
-
-		//Just return something for each of the formats
-		//When debugging, it ought to stop
-		//writedump( content );
-		//text/json
-		//text/xml
-		//text/html
-		//var content = _include( "std", "5xx-error" );
-
-		//text/plain
-		//custom?
-		//else?
-		//writedump( content ); abort;
-		return false;
-	} 
 	/*------------- DEPRECATED --------------------- */
 	//@title: wrapError 
 	//@args :
