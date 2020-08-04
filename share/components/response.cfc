@@ -14,16 +14,14 @@ accessors="true"
 	//Status of the page in question goes here
 	property name="status" type="numeric";
 
+	public boolean function _toBoolean() {
+		return false; 
+	}
+
 	//Send the message over the wire
 	private void function send() {
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
-		if ( 0 ) {
-			//TODO: Why is this not setting the status message...
-			logReport( "Status:      #s#" );
-			logReport( "Status Line: #getHttpHeaders()[ s ]#" );
-			//logReport( "Content:     #c#" );
-		}
 		r.setStatus( s, getHttpHeaders()[ s ] );
 		r.setContentType( m );
 		w.print( c );

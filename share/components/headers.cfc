@@ -1,5 +1,5 @@
 /* httpHeaders.cfc */
-component name="httpHeaders" {
+component name="headers" {
 	struct function init() {
 		return {
 			//1×× Informational
