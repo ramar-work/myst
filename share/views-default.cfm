@@ -199,8 +199,9 @@ ul li {
 </style>
 </head>
 
-<body>
 
+<body>
+<cfset model = #getModel().default#>
 <cfoutput>
 	<div class="container">
 		<div class="container-section">

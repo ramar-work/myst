@@ -78,7 +78,7 @@ accessors=true
 
 	//Relative path maps for framework directories
 	property name="routingKeys" type="string"
-		default="before,after,accepts,expects,filter,returns,scope,inherit";
+		default="before,after,accepts,expects,filter,returns,inherit";
 	//	default="before,after,accepts,expects,filter,returns,scope,wildcard,inherit";
 
 	//Relative path maps for framework directories
@@ -306,23 +306,7 @@ accessors=true
 		return linkText;
 	}
 
-
-	/**
-	 * crumbs( ... )
-	 *
-	 * Create "breadcrumb" link for really deep pages within a webapp. 
-	 */
-	public function crumbs () {
-		throw "EXPERIMENTAL";
-		var a = ListToArray(cgi.path_info, "/");
-		//writedump (a);
-		/*Retrieve, list and something else needs breadcrumbs*/
-		for (var i = ArrayLen(a); i>1; i--) {
-			/*If it's a retrieve page, have it jump back to the category*/
-			writedump(a[i]);
-		}
-	}
-
+	
 
 	/**
 	 * import( ... )
@@ -883,7 +867,7 @@ accessors=true
 	 *
 	 * Generates random letters.
 	 */
-	public String function randstr ( Numeric n ) {
+	public string function randstr ( Numeric n ) {
 		// make an array instead, and join it...
 		var str="abcdefghijklmnoqrstuvwxyzABCDEFGHIJKLMNOQRSTUVWXYZ0123456789";
 		var tr="";
@@ -1295,6 +1279,14 @@ abort;
 		return structToJSON( model );		
 	}
 
+	private struct function failure( required string message, struct exception ) {
+		return {
+			status = false,
+			error = message,
+			exception = StructKeyExists( arguments, "exception" ) ? exception : {},
+		};
+	}
+
 
 	/**
 	 * evalModel ( Required rd )
@@ -1302,140 +1294,85 @@ abort;
    * Return a struct composed of elements and keys...
 	 *
 	 **/		
-	private struct function evalModel( Required rd ) {
-		try {
-			//Check the type's value 
-			var pgArray = [];
-			var ev = getType( rd );
-			var result = {};
-		
-			//Build an array out of whatever value the model may be...
-			if ( ev.type != 'array' && ev.type != 'struct' ) {
-				ArrayAppend( pgArray, { type=ev.type, value=ev.value } );
-				//writedump( 'got #ev.type# at model.' );
-			}
-			/*
-			else if ( ev.type == 'struct' ) {
-				if ( StructKeyExists( ev.value, "exec" ) ) {
-					ArrayAppend(pgArray, { type="execution",value=ev.value.exec })
+	private struct function evaluateModelKey( Required struct routedata ) {
+		logReport( "Evaluating models @ #routedata.name#" );
+
+		var pgArray = [];
+		var result = {};
+		var ev;
+		var namespace = StructKeyExists( routedata, "scope" ) ? routedata.scope : {};
+		//Stop if there is no routedata
+		if ( !StructKeyExists( routedata, "model" ) ) {
+			return { status = true };
+		}
+
+		//Build an array out of whatever value the model may be...
+		if ( ( ev = getType( routedata.model ) ).type != 'array' && ev.type != 'struct' )
+			ArrayAppend( pgArray, { type=ev.type, value=ev.value } );
+		else if ( ev.type == 'struct' ) {
+			return failure( "Models as structs are not yet supported (check key at #routedata.file#)." ); 
+		}
+		else {
+			for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
+				var ee = ev.value[ ind ]; 
+				var ey = getType( ee );	
+				if ( ey.type == "string" || ey.type == "closure" )
+					ArrayAppend( pgArray, { type=ey.type, value=ey.value });
+				else if ( ey.type == "struct" )
+					ArrayAppend( pgArray, { type=ey.type, value=ey.value });
 				else {
-					return {
-						status = false,
-						error = "Model at key '?' does not contain key 'execute'",
-						exception = {}
-					}
+					return failure( "Got unsupported type for model at index #ind# at key '#routedata.file#'" );
 				}
 			}
-			*/
-			else if ( ev.type == 'struct' ) {
-				return {
-					status = false,
-					error = "Models as structs are not yet supported (check key at #rd.file#).",
-					exception = {}
+		}
+
+		//Now load each model, should probably put these in a scope
+		for ( var page in pgArray ) {
+			//Model can be a struct too, this automatically puts things in things...
+			if ( page.type == "struct" ) {
+				return failure( "Models as structs currently aren't supported." );
+			}
+			else if ( page.type == "string" ) {
+				var cexec;
+				var path = "#getRootDir()#app/#page.value#";
+				var nsref; 
+
+				//Use either namespace or basename to identify the model when more than one is in use...
+				if ( StructKeyExists( namespace, page.value ) ) 
+					nsref = namespace[ page.value ];
+				else {
+					//nsref = Replace( page.value, "/", "_" );
+					var pv = ListToArray( page.value, "/" );
+					nsref = pv[ Len( pv ) ];	
+				}
+
+				if ( !FileExists("#path#.cfc") && !FileExists("#path#.cfm") )
+					return failure( "Could not locate requested model file '#page.value#.cf[cm]' for key 'default'" );
+				else if ( FileExists( "#path#.cfc" ) ) {
+					if ( !( cexec = invokeComponent( "app.#page.value#" )).status )
+						return cexec;
+					else {
+						result[ nsref ] = cexec.results;
+					}
+				}
+				else { //if ( FileExists( "#path#.cfm" ) ) {
+					//Models executed this way end up being global or explicitly injected with setScope... 
+					if ( !( cexec = _include( where="app", name=page.value ) ).status ) {
+						return cexec;
+					}
 				}
 			}
 			else {
-				for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
-					var ee = ev.value[ ind ]; 
-					var ey = getType( ee );	
-					if ( ey.type == "string" || ey.type == "closure" )
-						ArrayAppend(pgArray, {type=ey.type,value=ey.value});
-					else if ( ey.type == "struct" ) {
-						ArrayAppend(pgArray, {type=ey.type,value=ey.value});
-						//renderPage(500, "Models as structs are not yet supported (please check key at #rd.file#).");
-						/*
-						if ( StructKeyExists( ey.value, "exec" ) )
-							ArrayAppend(pgArray, {type="execution",value=ey.value.exec});
-						else {
-							renderPage(500, "Model struct does not contain 'exec' key (check key at #rd.file#)");
-						}
-						*/
-					}
-					else {
-						//renderPage(500,"Error: got unsupported type for model at index #ind# at key '#rd.file#'");
-						return {
-							status = false,
-							error = "Got unsupported type for model at index #ind# at key '#rd.file#'",
-							exception = {}
-						}
-					}
+				//Catch closures and send the result set into it
+				try {
+					page.value( result );
 				}
-			}
-
-			//Now load each model, should probably put these in a scope
-			for ( var page in pgArray ) {
-				if ( page.type == "string" ) {
-					var path = "#getRootDir()#app/#page.value#";
-					if ( FileExists( "#path#.cfc" ) ) {
-						result[ page.value ] = createObject( "component", "app.#page.value#" ).init( this );
-					}
-					//This usually assumes a string...
-					else if ( FileExists( "#path#.cfm" ) ) {
-						var c;
-						if ( !( c = _include( where="app", name=page.value ) ).status ) {
-							return c;
-							//renderPage(500, "Error executing model file '#page.value#'",c.errors);
-							/*
-							return {
-								status = false,
-								error = "Error executing model file '#page.value#'",
-								exception = c.errors
-							}
-							*/
-						}
-						result[ page.value ] = c.ref;
-					}
-					else {
-						//The file couldn't be found. 
-						//renderPage(500, "Could not locate model file '#page.value#'" );
-						return {
-							status = false,
-							error = "Could not locate requested model file " &
-								"'#page.value#.cf[cm]' for key 'default'",
-							exception = {}
-						}
-					}
-				}
-				//Model can be a struct too, this automatically puts things in things...
-				else if ( page.type == "struct" ) {
-					//Loop through each key in the struct 
-					//renderPage( 500, "Models as structs currently aren't supported." );
-					return {
-						status = false,
-						error = "Models as structs currently aren't supported.",
-						exception = {}
-					}
-				}
-				//This catches closures...
-				else {
-					try {
-						//We can pass something in
-						//result[ page.value ] = 
-						page.value( result );
-					}
-					catch (any e) {
-						var t = getType( rd );
-						//renderPage( 500, "Error executing model closure at route '???'", e );
-						return {
-							status = false,
-							error = "Error executing model closure at route '???'",
-							exception = {}
-						}
-					}
+				catch (any e) {
+					return failure( "Error executing model closure at route '???'" );
 				}
 			}
 		}
-		catch (any e) {
-			//Manually wrap the error template here.
-			var t = getType( rd );
-			//renderPage( 500, "Error executing model composed of type '#t.type#' at route '???'", e );
-			return {
-				status = false,
-				error = "Error executing model composed of type '#t.type#' at route '???'", 
-				exception = e
-			}
-		}
-		//return result;
+		
 		return {
 			status = true,
 			results = result
@@ -1503,6 +1440,25 @@ abort;
 	 */
 	private Struct function checkFileStructure( string directory ) {
 		
+	}
+
+
+	
+	/**
+   * Wrap loading components to catch any errors.
+	 */
+	private any function invokeComponent( string cname ) {
+		var comp;
+		try {
+			comp = createObject( "component", cname ).init( this );
+		}
+		catch (any e) {
+			return failure( e.message, e ); 
+		}
+		return {
+			status = true,
+			results = comp
+		}
 	}
 
 
@@ -1792,39 +1748,37 @@ var iter = 0;
 	}
 
 	private struct function evaluateReturnsKey( Struct routedata, Struct appdata ) {
+		var r;
+		var k;
+		logReport( "Evaluating key 'returns' @ /#routedata.name#..." );
 
 		//Check for key first in routedata, and then appdata
-		var r = StructKeyExists( routedata, "returns" ) ? routedata.returns :
-			StructKeyExists( appdata, "returns" ) ? appdata.returns : false;	
-
-		if ( r && r.getType() == 'string' ) {
-			logReport( "Evaluating key 'returns' @ /#data.page#..." );
-			//Check if it's supported
-			if ( getType( routedata.returns ).type neq "string" ) {
-				//renderPage( 500, "Value at key 'returns' in struct associated with '#data.page#' is not a string." );
-				return {
-					error = "Value at key 'returns' in struct associated with #routedata.page# is not a string.",
-					exception = {}
-				}
-			}
-
-			if ( !StructKeyExists( getMimeTypes(), routedata.returns ) ) {
-				//renderPage( 500, "Unsupported return type '#routedata.returns#' was selected." );
-				return {
-					error = "Unsupported return type '#routedata.returns#' was selected.",
-					exception = {}
-				}
-			}
-			//setSelectedContentType( routedata.returns );	
-			logReport( "SUCCESS!" );
-			return {
-				status = true,
-				results = routedata.returns
+		if ( StructKeyExists( routedata, "returns" ) ) {
+			r = routedata.returns;
+			k = "routes.#routedata.name#";
+		}
+		else if ( StructKeyExists( appdata, "returns" ) ) {
+			r = appdata.returns;
+			k = "top-level";
+		}
+		else {
+			return { 
+				status = true, 
+				results = getDefaultContentType()
 			}
 		}
+
+		if ( getType( r ).type neq "string" ) {
+			return failure( "Key 'returns' at #k# is not a string." );
+		}
+
+		if ( !StructKeyExists( getMimeTypes(), routedata.returns ) ) {
+			return failure( "Key 'returns' points to unsupported mimetype '#routedata.returns#' at #routedata.name#." );
+		}
+
 		return {
 			status = true,
-			results = getDefaultContentType()
+			results = routedata.returns
 		}
 	}
 
@@ -1929,6 +1883,7 @@ var iter = 0;
 		return { status = true };	
 	}
 
+/*
 	private struct function evaluateModelKey( Struct routedata ) {
 		logReport( "Evaluating models @ #routedata.name#" );
 		//This is where rethinking things could help, scope should be another argument.
@@ -1939,8 +1894,7 @@ var iter = 0;
 		}
 
 		return { status = true }
-
-	}
+	*/
 
 	private function evaluateFilterKey( Struct routedata ) {
 		//Filter out the scope when returning JSON
@@ -2023,7 +1977,7 @@ var iter = 0;
 		var pageParts = ListToArray(page, "/");
 	
 		//Invoke all components 
-		setHttpHeaders( new std.components.httpHeaders() );
+		setHttpHeaders( new std.components.headers() );
 		setMimetypes( new std.components.mimes() ); 
 		setCommonExtensionsToMimetypes( new std.components.files() );
 		setRunId( this.randstr(32) );
@@ -2105,11 +2059,9 @@ var iter = 0;
 			//show up here...
 			setUrlBase( appdata.base );
 			logReport( "Success!" );
-			writeoutput( "Success" );
 		}
 		catch (any e) {
 			logReport( "Failure!" );
-			writeoutput( "Failure" );
 			return this.respondWith( 500, { error="Deserializing data.cfm failed", exception=e, status=false } );
 			abort;
 		}
@@ -2148,7 +2100,7 @@ var iter = 0;
 		//return this.respondWith( ???, ??? );
 			 
 		//returns
-		if ( ( ctx.returns = evaluateReturnsKey( ctx, appdata ) ).status )
+		if ( ( ctx.returns = evaluateReturnsKey( ctx.route, appdata ) ).status )
 			res.setContentType( ctx.returns.results );
 		else {
 			return this.respondWith( 500, ctx.returns );
@@ -2180,18 +2132,21 @@ var iter = 0;
 			return this.respondWith( 200, ctx.query );
 		}
 		
+//createObject("component","app.api.start").init( this );
+//abort;
 		//Check the model
-		if ( !(ctx.model = evaluateModelKey( ctx.route )).status )
+		if ( !(ctx.model = evaluateModelKey( ctx.route )).status ) {
 			return this.respondWith( 500, ctx.model );
+		}
 		else if ( StructKeyExists( ctx.model, "results" ) ) {
 			//ctx.model = this.extractResults( ctx.model );
 			setModel( ctx.model.results );
 		}
 
+		//return this.respondWith( 200, ctx.view );
 		//Filter: Optional for now, but will extract certain keys
 		//if ( !(ctx.filter = evaluateFilterKey( ctx.route )).status )
 		//	this.respondWith( 500, error.render( ctx.filter ) );
-
 		//View interpretation can fail
 		if ( !(ctx.view = evaluateViewKey( ctx.route, ctx.model )).status ) {
 			return this.respondWith( 500, ctx.view );
@@ -2208,197 +2163,6 @@ var iter = 0;
 
 		//There is absolutely no reason to end up here.  Ever.
 		return this;
-	}
-
-	/*
-	private struct function findResource ( Required String name, Required Struct rl ) {
-
-	why not return with some smart things from here?
-	404 is if something can't be found
-
-	- combine the path as you go down, b/c you need to check for files later on, 
-
-	status = 200, 404, etc
-	path = path as we go through the thing
-	*/
-	private struct function findResource ( Required String name, Required Struct rl ) {
-		//Define a base here
-		var base = "default";
-		var localName;
-		var tt;
-
-		//Handle situations where no routes are defined.
-		if ( !structKeyExists( rl, "routes" ) || StructIsEmpty( rl.routes ) ) {
-			//return base;
-			return { model="default", view="default", file="", path="", status=200 }
-		}
-
-		//Modify model and view include paths if there is a basedir present.
-		if ( StructKeyExists( rl, "base" ) ) {
-			if ( Len( rl.base ) > 1 )
-				base = rl.base;	
-			else if ( Len(rl.base) == 1 && rl.base == "/" )
-				base = "/";
-			else {
-				base = rl.base;	
-			}
-		}
-
-		//Simply lop the basedir off of the requested URL if that was requested
-		if ( StructKeyExists(rl, "base") ) {
-			localName = Replace( arguments.name, base, "" );
-		}
-
-		/*
-		//Check for resources in GET or the CGI.stringpath 
-		if ( StructKeyExists(rl, "handler") && CompareNoCase(rl.handler, "get") == 0 ) {
-			if ( isDefined("url") and isDefined("url.action") )
-				name = url.action;
-			else {
-				if (StructKeyExists(rl, "base")) {
-					name = Replace(name, base, "");
-				}
-			}
-		}
-		else {
-			//Cut out only routes that are relevant to the current application.
-			if ( StructKeyExists(rl, "base") ) {
-				name = Replace( name, base, "" );
-			}
-		}
-		*/
-
-		//Handle the default route if rl is not based off of URL
-		if ( !StructKeyExists( rl, "handler" ) && localName == "index.cfm" ) {
-			//return rl.routes.default;
-			var tt = rl.routes.default;
-			tt.file = "index.cfm";
-			tt.path = "/";	
-			tt.status = 200;
-			return tt;
-		}
-
-		/*
-		writeoutput("at route evaluator:" );
-		writedump( "localName: #localName#" );
-		writedump( ListToArray( localName, "/" ) );
-		//writedump( rl.routes );
-		*/
-
-		//This is the second version, die out and return
-		//Chopping from the top, until we stop, is the best thing...
-		var t = rl.routes;
-		var et = {};
-		var path = "";
-		var file;
-		var l = ListToArray( localName, "/" );
-
-		//to make this easy, something EXPLICIT needs to catch
-		for ( var x in l ) {
-			var fn = Replace( x, ".cfm", "" );
-			if ( StructKeyExists( t, x ) ) {
-				t = t[ x ];
-				path = ListAppend( path, x, "/" );
-				file = x;
-			}
-			else if ( StructKeyExists( t, fn ) ) {
-				t = t[ fn ];
-				path = ListAppend( path, fn, "/" );
-				file = fn;
-			}
-			/*
-			'*' wildcard catch	
-			regex catch
-			*/
-			else {
-				//writeoutput("<h2>we died</h2>" );
-				return { 
-					status=404
-				, path=path
-				, file=x
-				};
-			}
-		}
-
-		var diff = 	Len(path) - Len(file);
-		t.file = file;
-		t.path = ( diff ) ? Left( path, diff ) : path; 
-		t.status = 200;
-		return t;	
-	}
-
-
-	/**
-	 * resourceIndex 
-	 *
-	 * Find the index of a resource if it exists.  Return 0 if it does not.
-	 */
-	private String function resourceIndex ( Required String name, Required Struct rl ) {
-		//Define a base here
-		var base = "default";
-		var localName;
-
-		//Handle situations where no routes are defined.
-		if ( !structKeyExists( rl, "routes" ) || StructIsEmpty( rl.routes ) )
-			return base;
-
-		//Modify model and view include paths if there is a basedir present.
-		if ( StructKeyExists( rl, "base" ) ) {
-			if ( Len( rl.base ) > 1 )
-				base = rl.base;	
-			else if ( Len(rl.base) == 1 && rl.base == "/" )
-				base = "/";
-			else {
-				base = rl.base;	
-			}
-		}
-
-		//Simply lop the basedir off of the requested URL if that was requested
-		if ( StructKeyExists(rl, "base") ) {
-			localName = Replace( arguments.name, base, "" );
-		}
-
-		/*
-		//Check for resources in GET or the CGI.stringpath 
-		if ( StructKeyExists(rl, "handler") && CompareNoCase(rl.handler, "get") == 0 ) {
-			if ( isDefined("url") and isDefined("url.action") )
-				name = url.action;
-			else {
-				if (StructKeyExists(rl, "base")) {
-					name = Replace(name, base, "");
-				}
-			}
-		}
-		else {
-			//Cut out only routes that are relevant to the current application.
-			if ( StructKeyExists(rl, "base") ) {
-				name = Replace( name, base, "" );
-			}
-		}
-		*/
-
-		//Handle the default route if rl is not based off of URL
-		if ( !StructKeyExists( rl, "handler" ) && localName == "index.cfm" ) {
-			return "default";
-		}
-
-		/*
-		writeoutput("at route evaluator:" );
-		writedump( "localName: #localName#" );
-		writedump( ListToArray( localName, "/" ) );
-		writedump( rl.routes );
-		*/
-
-		//This is the first version
-		//If you made it this far, search for the requested endpoint
-		for ( var x in rl.routes ) {
-			if ( localName == x || Replace(localName, ".cfm", "" ) == x ) {
-				return x;
-			}
-		}
-	
-		//You probably found nothing, so either do 404 or some other stuff.
-		return ToString(0);
 	}
 
 
@@ -2819,10 +2583,9 @@ var iter = 0;
 
 	//Handles rendering error messages according to the type of content
 	public string function render( struct content ) {
-		if ( !this.getResponse() )
-			return content.results;
-		else if ( this.getResponse().getContentType() == "application/json" )
+		if ( this.getResponse().getContentType() == "application/json" ) {
 			return SerializeJSON( content.results ); 
+		}
 		else if ( this.getResponse().getContentType() == "text/xml" )
 			return SerializeXML( content.results ); 
 		else {

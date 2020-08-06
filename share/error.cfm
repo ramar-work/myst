@@ -16,16 +16,16 @@
 
 			<h5>Error Detail</h5>
 			<p class="error text">
-				Caught error at line #v.getLineNumber()#, col #v.getColumnNumber()#
+				Caught error at line #v.getErrorLineNumber()#, col #v.getErrorColumnNumber()#
 			</p>
 
 			<!--- Show the code section where things went wrong --->	
 			<h6>Code Dump</h6>
-			<div>#v.getDump()#</div>
+			<div>#v.getErrorDump()#</div>
 
 			<!--- Show the stack trace if asked --->	
 			<h6>Stack Trace</h6>
-			<div>#v.getStackTrace()#</div>
+			<div>#v.getErrorStackTrace()#</div>
 		</div>
 	</div>
 </body>

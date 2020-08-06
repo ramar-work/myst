@@ -11,13 +11,17 @@ accessors=true
 
 	property name="errorMessage" type="string" default="Error occurred.";
 
-	property name="lineNumber" type="numeric"; 
+	property name="errorDetail" type="string"; 
+	
+	property name="errorException" type="object"; 
 
-	property name="columnNumber" type="numeric"; 
+	property name="errorLineNumber" type="numeric"; 
 
-	property name="stacktrace" type="string"; 
+	property name="errorColumnNumber" type="numeric"; 
 
-	property name="dump" type="string"; 
+	property name="errorStacktrace" type="string"; 
+
+	property name="errorDump" type="string"; 
 
 	//Dependencies
 	property name="response" type="object"; 
@@ -28,13 +32,28 @@ accessors=true
 		this.setErrorMessage( error.error );
 		if ( StructKeyExists( error, "exception" ) && !StructIsEmpty( error.exception ) ) {
 			//The error class could be invoked instead...
-			var me = error.exception
-			if ( StructKeyExists( me, "TagContext" ) ) {
-				this.setLineNumber( me.TagContext[1].line );
-				this.setColumnNumber( me.TagContext[1].column );
-				this.setDump( me.TagContext[1].codePrintHTML );
-				this.setStackTrace( me.StackTrace );
+			this.setErrorException( error.exception );
+			if ( StructKeyExists( error.exception, "Detail" ) ) {
+				this.setErrorDetail( error.exception.detail );
+			}
+			if ( StructKeyExists( error.exception, "TagContext" ) ) {
+				this.setErrorLineNumber( error.exception.TagContext[1].line );
+				this.setErrorColumnNumber( error.exception.TagContext[1].column );
+				this.setErrorDump( error.exception.TagContext[1].codePrintHTML );
+				this.setErrorStackTrace( error.exception.StackTrace );
 			}	
+		}
+	}
+
+	//
+	public struct function serialize() {
+		return {
+			error_message = this.getErrorMessage()
+		, error_detail = this.getErrorDetail()
+		, line = this.getErrorLineNumber()
+		, column = this.getErrorColumnNumber()
+		, dump = this.getErrorDump()
+		, stack_trace = this.getErrorStackTrace()
 		}
 	}
 
@@ -42,10 +61,11 @@ accessors=true
 	public string function render( struct error ) {
 		this.explode( error );
 		//
-		if ( this.response.getContentType() == "application/json" )
-			return SerializeJSON( this ); 
+		if ( this.response.getContentType() == "application/json" ) {
+			return SerializeJSON( this.serialize() ); 
+		}
 		else if ( this.response.getContentType() == "text/xml" )
-			return SerializeXML( this ); 
+			return SerializeXML( this.serialize() ); 
 		else {
 			//Include an error handler file
 			fwResults = this.framework._include( "std", this.getErrorHandler() );
@@ -57,14 +77,14 @@ accessors=true
 				return 
 					"<h2>#this.getErrorMessage()#</h2>" &
 					"<h3>HTTP STATUS MESSAGE SHOULD GO HERE</h3>" &
-					"<p>#this.getStackTrace()#</p>"
+					"<p>#this.getErrorStackTrace()#</p>"
 			}
 		}	
 	}
 
-	function init( res /*Instance of response for content-type*/, fw /*Myst instance*/ ) {
-		this.response = res;
-		this.framework = fw;
+	function init( response, myst ) {
+		this.response = response;
+		this.framework = myst;
 		return this;
 	}
 }

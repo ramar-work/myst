@@ -5,7 +5,7 @@ Application.cfc
 
 Author
 ------
-Antonio R. Collins II (rc@tubularmodular.com, ramar.collins@gmail.com)
+Antonio R. Collins II (ramar@collinsdesign.net)
 
 Copyright
 ---------
@@ -20,8 +20,9 @@ All Application.cfc rules are specified here.
  --->
 component {
 
+	property name="applicationname";
+
 	function onApplicationStart() {
-		application.defaultdatasource = "__DATASOURCE__";
 		application.sessionManagement = true;
 		return true;
 	}
@@ -36,45 +37,17 @@ component {
 
 	function onRequest (string targetPage) {
 		try {
-			include "index.cfm";
+			new myst( targetPage );	
 		} 
 		catch (any e) {
 			writedump( e ); 
 			abort;
 		}
+		return false;
 	}
 
 
 	function onMissingTemplate (string Page) {
-		include "index.cfm";
+		include "_.cfm";
 	}
-
-
-	/*
-	function onError (required any Exception, required string EventName) {
-		e = Exception;
-		//...
-		if ( StructKeyExists( e, "TagContext" ) ) {
-			//Short note the tag with the information.
-			av = e.TagContext[ 0 ];
-
-			//Better exception handling is needed here....
-			status_code    = 500;
-			status_message = 
-				"<ul>" &
-				"<li>Page '" & arguments.targetPage & "' does not exist.<li>" &
-				"<li>At line " & av.line & "</li>" &
-				"<li><pre>" & av.codePrintHTML & "</pre></li>" &
-				"</ul>";
-				av.codePrintHTML &
-
-				"Page '" & arguments.targetPage & "' does not exist."
-			;
-			include "std/5xx-view.cfm";
-		}
-	
-		//abort;
-		include "failure.cfm";
-	}
-	*/
 }
