@@ -294,7 +294,7 @@ accessors=true
 		//If this is a symbolic representation (TODO: or a .cfm), do something else.
 		if ( Len( linkText ) > 1 ) {
 			var f = Find( "?", linkText );
-			if ( StructKeyExists( appdata, "autoSuffix" ) && Right( linkText, 4 ) != ".cfm" ) {
+			if ( StructKeyExists( appdata, "autoSuffix" ) && appdata.autoSuffix == true && Right( linkText, 4 ) != ".cfm" ) {
 				if ( f == 0 ) 
 					linkText &= ".cfm";
 				else {
@@ -976,18 +976,29 @@ accessors=true
 	 * sendResponse
 	 *
 	 * Send a response.
+	 *
 	 */
-	private function sendResponse (Required Numeric s, Required String m, Required c, Struct headers) {
-		//var r = getPageContext().getCFOutput().clear();
+	private boolean function sendResponse (Required Numeric s, Required string m, Required string c, Struct headers) {
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
-		r.setStatus( s, getHttpHeaders()[ s ] );
+		var sMessage = getHttpHeaders()[ s ];
+		r.setStatus( s );
+		r.setStatus( s, sMessage );
+		//r.setStatusMessage( getHttpHeaders()[ s ] );
 		r.setContentType( m );
+		r.setContentLength( Len(c) );
 		w.print( c );
 		w.flush();
 		r.close(); 
+		return true;
 	}
 
+	/**
+	 * sendBinaryResponse
+	 *
+	 * Send a binary response.
+	 *
+	 */
 	private function sendBinaryResponse(Required numeric s, Required string m, required numeric size, required c) {
 		var q = getPageContext().getResponse();
 		var r = getPageContext().getResponseStream();
@@ -1250,7 +1261,7 @@ abort;
 	}
 
 
-	/*
+	/**
 	 * returnAsJson ( Struct model )
 	 *
    * ...
@@ -1349,7 +1360,7 @@ abort;
 				if ( !FileExists("#path#.cfc") && !FileExists("#path#.cfm") )
 					return failure( "Could not locate requested model file '#page.value#.cf[cm]' for key 'default'" );
 				else if ( FileExists( "#path#.cfc" ) ) {
-					if ( !( cexec = invokeComponent( "app.#page.value#" )).status )
+					if ( !( cexec = invokeComponent( "app.#page.value#", result )).status )
 						return cexec;
 					else {
 						result[ nsref ] = cexec.results;
@@ -1434,23 +1445,12 @@ abort;
 
 		
 	/**
-   * checkFileStructure()
-	 *
-	 * Makes sure that expected directories are were they should be.
-	 */
-	private Struct function checkFileStructure( string directory ) {
-		
-	}
-
-
-	
-	/**
    * Wrap loading components to catch any errors.
 	 */
-	private any function invokeComponent( string cname ) {
+	private any function invokeComponent( string cname, model ) {
 		var comp;
 		try {
-			comp = createObject( "component", cname ).init( this );
+			comp = createObject( "component", cname ).init( this, model );
 		}
 		catch (any e) {
 			return failure( e.message, e ); 
@@ -1997,7 +1997,7 @@ var iter = 0;
 				var extension;
 				var mimetype;
 				ArrayDeleteAt( pageParts, Len( pageParts ) );
-	 
+	
 				//If the file does not exist, send a 404
 				spath = ArrayToList( pageParts, "/" );
 				if ( !FileExists( spath ) ) {
@@ -2132,8 +2132,6 @@ var iter = 0;
 			return this.respondWith( 200, ctx.query );
 		}
 		
-//createObject("component","app.api.start").init( this );
-//abort;
 		//Check the model
 		if ( !(ctx.model = evaluateModelKey( ctx.route )).status ) {
 			return this.respondWith( 500, ctx.model );
@@ -2613,7 +2611,9 @@ var iter = 0;
 		else {
 			contentBuffer = this.render( con );
 		}
-		this.sendResponse( status, "text/html", contentBuffer );
+		var res = getResponse();	
+		this.sendResponse( status, res.getContentType(), contentBuffer );
+		//res.send( status, res.getContentType(), contentBuffer );
 		return true;
 	} 
 
