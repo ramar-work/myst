@@ -1,7 +1,4 @@
-component 
-name="ctx"
-accessors="true"
-{
+component name="ctx" accessors="true" {
 	//The active route goes here	
 	property name="route" type="struct";
 

@@ -78,7 +78,7 @@ accessors=true
 
 	//Relative path maps for framework directories
 	property name="routingKeys" type="string"
-		default="before,after,accepts,expects,filter,returns,inherit";
+		default="before,after,accepts,expects,filter,returns,namespace,model,view";
 	//	default="before,after,accepts,expects,filter,returns,scope,wildcard,inherit";
 
 	//Relative path maps for framework directories
@@ -1290,7 +1290,7 @@ abort;
 		return structToJSON( model );		
 	}
 
-	private struct function failure( required string message, struct exception ) {
+	public struct function failure( required string message, struct exception ) {
 		return {
 			status = false,
 			error = message,
@@ -1311,7 +1311,9 @@ abort;
 		var pgArray = [];
 		var result = {};
 		var ev;
-		var namespace = StructKeyExists( routedata, "scope" ) ? routedata.scope : {};
+		var namespace = StructKeyExists( routedata, "namespace" ) ? routedata.namespace: {};
+//writedump( namespace );writedump( routedata ); abort;
+
 		//Stop if there is no routedata
 		if ( !StructKeyExists( routedata, "model" ) ) {
 			return { status = true };
@@ -1349,13 +1351,14 @@ abort;
 				var nsref; 
 
 				//Use either namespace or basename to identify the model when more than one is in use...
-				if ( StructKeyExists( namespace, page.value ) ) 
+				if ( StructKeyExists( namespace, page.value ) )
 					nsref = namespace[ page.value ];
 				else {
 					//nsref = Replace( page.value, "/", "_" );
 					var pv = ListToArray( page.value, "/" );
 					nsref = pv[ Len( pv ) ];	
 				}
+//writedump( nsref ); abort;
 
 				if ( !FileExists("#path#.cfc") && !FileExists("#path#.cfm") )
 					return failure( "Could not locate requested model file '#page.value#.cf[cm]' for key 'default'" );
@@ -1383,7 +1386,7 @@ abort;
 				}
 			}
 		}
-		
+
 		return {
 			status = true,
 			results = result
@@ -1536,30 +1539,15 @@ abort;
 			var callstat = 0;
 			for ( var q in dirQuery ) {
 				var n = Replace( q.name, ".cfm", "" );
-				callstat = _include( where = "routes", name = n );
-				if ( !callstat.status ) {
-					//renderPage( 500, "Syntax error at routes/#n#", callstat.errors );
-					/*
-						status=500
-					, err=callstat.errors
-					, content="Syntax error at routes/#n#"
-					);
-					*/
-					return {
-						error = "Syntax error at routes/#n#",
-						exception = callstat.errors
-					}
+				if ( !( callstat = _include( where = "routes", name = n ) ).status ) {
+					return failure( "Syntax error at routes/#n#", callstat.errors );
 				}
 			}
 			logReport("SUCCESS - All routes loaded!");
 			return StructNew();
 		}
 		catch (any e) {
-			//renderPage( 500, "Route injection failed.", e );
-			return	{
-				error = "Route injection failed.",
-				exception = e
-			} 
+			return failure( "Route injection failed.", e );
 		}
 	}
 
@@ -1573,40 +1561,75 @@ abort;
 	}
 
 
-	private function evaluateRoutingTable( Required Struct arg, Struct found ) {
+	/**
+	 * ???
+   *
+	 * This is supposed to turn my routing table into something else.
+	 **/
+	private function evaluateRoutingTable( Required Struct arg, Struct found, key = "__TOP__" ) {
+//writeoutput( "Evaluating at level '#key#'<br />" );
+
+		var a;
 		try {
-		//If found is not blank, loop through each of those and add them...
-		if ( !StructIsEmpty( found ) ) {
-			for ( var f in found ) arg[ f ] = found[ f ];
-		}
+			var nStruct = {};
 
-		//Check the struct for any keys, apply them to whatever struct
-		var nStruct = {};
-		for ( var k in ListToArray( getRoutingKeys() ) ) {
-			if ( StructKeyExists( arg, k ) ) nStruct[ k ] = arg[ k ];
-		}
-
-		//Finally, loop through...gin.cfm
-		for ( var vv in arg ) {
-			if ( ArrayContains( ListToArray( getRoutingKeys() ), vv ) ) {
-				continue;
-				//writeoutput( "Skip key '#vv#' at ...<br />"  );
+			//If found is not blank, loop through each of those and add them...
+			if ( !StructIsEmpty( found ) ) {
+				for ( var f in found ) {
+					arg[ f ] = found[ f ];
+				}
 			}
 
-			if ( getType( arg[ vv ] ).type eq 'struct' ) {
-				evaluateRoutingTable( arg[ vv ], nStruct );
+			//Check the struct for any keys, apply them to whatever struct
+			for ( var k in ListToArray( getRoutingKeys() ) ) {
+				if ( StructKeyExists( arg, k ) ) {
+					nStruct[ k ] = arg[ k ];
+				}
 			}
-		}
+
+			//Finally, loop through...gin.cfm
+			for ( var vv in arg ) {
+				//TODO: This is probably slow
+				//Descend into each key and apply the next level...
+
+				if ( !ArrayContains( ListToArray( LCase( getRoutingKeys() ) ), LCase( vv ) ) ) {
+//writeoutput( "#vv# was found...<br />" ); 
+
+					//If the type is a struct, we need to evaluate again
+					if ( getType( arg[ vv ] ).type eq 'struct' ) {
+				
+//writeoutput( "before transform:<br>" );	
+//writedump( arg[ vv ] );	
+						//return arg and replacing that key ought to work best
+						var y = evaluateRoutingTable( arg[ vv ], nStruct, vv );
+						if ( y.status )
+							arg[ vv ] = y.results;
+						else {
+							return {
+								status = false
+							, message=  "router inheritance failed."
+							}
+						}
+						
+//writeoutput( "after transform:<br>" );	
+//writedump( y.results );	
+					}
+				}
+
+			}
 		}
 		catch (any e) {
 			return {
 				error = "Unknown exception occurred at routing table evaluation."
-				,exception = e
-				,status = false
+			, exception = e
+			, status = false
 			}
 		}
+
+//writeoutput( "Done with key #key# <br />" );
 		return {
 			status = true
+		, results = arg
 		}
 	}
 
@@ -1672,9 +1695,10 @@ abort;
 		var route = data.routes;
 		var paths = ListToArray( localName, "/" );
 		ArrayDeleteAt( paths, Len( paths ) );
-var iter = 0;
 		//Do you want to match literally? Or match using regex, at a specific level?
+
 		for ( var filepath in paths ) {
+
 			if ( StructKeyExists( route, filepath ) ) {
 				route = route[ filepath ];
 				path = ListAppend( path, filepath, "/" );
@@ -1683,22 +1707,35 @@ var iter = 0;
 			else {
 				//No simple matches were found, so run against any regexes
 				var re;
+				var is404 = false;
 				var reMatched = false;
 				try {
 					//Check the current level for wildcard or RE
 					var routeKeys = this.extractKeys( route ); 
 					routeKeys.each( function(e,i,a) { a[i] = LCase(e); } );
-					routeKeys.removeAll( ListToArray( "#getRoutingKeys()#,model,view" ) );
-					for ( key in routeKeys ) {
-						re = key;
-						//Pull out normally matched strings
-						if ( REFind( "[a-z]", key ) == 1 )
-							continue;
-						//Stop at the first match
-						if ( REFind( key, filepath ) > 0 ) {
-							reMatched = true;
-							route = route[ key ];						
-							break;
+					routeKeys.removeAll( ListToArray( "#getRoutingKeys()#" ) );
+
+					//If the name is NOT regexed (or there are no regexes)
+					//It's a 400?
+					if ( Len( routeKeys ) == 0 )
+						is404 = true;
+					else {	
+						//if it is, but there is no match then it's a 404
+						for ( key in routeKeys ) {
+							re = key;
+							//Pull out normally matched strings
+							if ( REFind( "[a-z]", key ) == 1 ) {
+								is404 = true;
+								continue;
+							}
+
+							is404 = false;
+							//Stop at the first match
+							if ( REFind( key, filepath ) > 0 ) {
+								reMatched = true;
+								route = route[ key ];						
+								break;
+							}
 						}
 					}
 				}
@@ -1713,7 +1750,9 @@ var iter = 0;
 				if ( !reMatched ) {
 					return {
 						status = false 
-					, error = "No mapping for '#filepath#' found." 
+					, error = (is404) ? "No mapping for '#filepath#' found." :
+							"Parameter did not match regex at #re#"
+					, type = (is404) ? 404 : 400 
 					, path=path
 					, file=filepath
 					};
@@ -1953,6 +1992,85 @@ var iter = 0;
 	}
 
 	/**
+	 * serveStaticResource( array parts )
+	 *
+	 * ...
+	 *
+	 **/
+	private function serveStaticResource( required array parts, string path ) {
+		try {
+			var spath;
+			var metadata;
+			var extension;
+			var mimetype;
+
+			if ( StructKeyExists( arguments, "path" ) )
+				spath = arguments.path;
+			else {
+				//Get the part of URL that we want.
+				ArrayDeleteAt( parts, Len( parts ) );
+
+				//Generate the path of the requested file here.
+				spath = ArrayToList( parts, "/" );
+			}
+
+			//If the file does not exist, send a 404
+			if ( !FileExists( spath ) ) {
+				return this.sendResponse( 404, "text/html", "Error 404: File '#spath#' not found" );
+			}
+
+			//If you have problems accessing it, send a 403
+			metadata = GetFileInfo( spath );
+			if ( !metadata.canRead ) {
+				return this.sendResponse( 403, "text/html", "Error: Access Forbidden" );	
+			}
+
+			extension = this.GetExtension( spath );
+			if ( extension eq "" || !StructKeyExists( getCommonExtensionsToMimeTypes(), extension ) )
+				mimetype = "application/octet-stream"; 
+			else {
+				mimetype = getCommonExtensionsToMimetypes()[ extension ];
+			}
+
+			//If the file exists, throw it back
+			return this.sendBinaryResponse( 200, mimetype, metadata.size, FileReadBinary( spath ) );  
+		}
+		catch (any e) {
+			return this.respondWith( 500, {
+				error = "unknown error",
+				exception = e,
+				status = false
+			});
+		}
+	}
+
+
+	private function loadAppDataComponent( ) {
+		logReport( "Loading data.cfm..." );
+		try {
+			include "data.cfm";
+			setAppdata( manifest );
+			//appdata = CreateObject( "component", "data" );
+			var appdata = getAppdata();
+
+			//All of the properties in data.cfm (or data.cfc) should
+			//show up here...
+			setUrlBase( appdata.base );
+			logReport( "Success!" );
+			return {
+				status=true,
+				results=appdata
+			}
+		}
+		catch (any e) {
+			logReport( "Failure!" );
+			return failure( "Deserializing data.cfm failed", e );
+			//return this.respondWith( 500, { error="Deserializing data.cfm failed", exception=e, status=false } );
+			//abort;
+		}
+	}
+
+	/**
 	 * makeIndex( Myst mystInstance )
 	 *
 	 * Generate a page through the page generation cycle.
@@ -1973,7 +2091,6 @@ var iter = 0;
 		//variables.db = MystInstance.app.data;
 		//variables.myst = MystInstance;
 		//variables.data = MystInstance.app;
-		var appdata;
 		var pageParts = ListToArray(page, "/");
 	
 		//Invoke all components 
@@ -1988,47 +2105,6 @@ var iter = 0;
 		for ( var k in getArrayConstantMap() ) constantMap[ k ] = getRootDir() & k;
 		setConstantMap( constantMap );
 
-		//Serve static pages first and abort
-		if ( Len( pageParts ) > 2 && pageParts[1] == "assets" ) {
-
-			try {
-				var spath;
-				var metadata;
-				var extension;
-				var mimetype;
-				ArrayDeleteAt( pageParts, Len( pageParts ) );
-	
-				//If the file does not exist, send a 404
-				spath = ArrayToList( pageParts, "/" );
-				if ( !FileExists( spath ) ) {
-					return this.sendResponse( 404, "text/html", "Error 404: File not found" );
-				}
-
-				//If you have problems accessing it, send a 403
-				metadata = GetFileInfo( spath );
-				if ( !metadata.canRead ) {
-					return this.sendResponse( 403, "text/html", "Error: Access Forbidden" );	
-				}
-
-				extension = this.GetExtension( spath );
-				if ( extension eq "" || !StructKeyExists( getCommonExtensionsToMimeTypes(), extension ) )
-					mimetype = "application/octet-stream"; 
-				else {
-					mimetype = getCommonExtensionsToMimetypes()[ extension ];
-				}
-
-				//If the file exists, throw it back
-				return this.sendBinaryResponse( 200, mimetype, metadata.size, FileReadBinary( spath ) );  
-			}
-			catch (any e) {
-				return this.respondWith( 500, {
-					error = "unknown error",
-					exception = e,
-					status = false
-				});
-			}
-		}
-
 		//Invoke this to maintain some control over the environment 
 		var ctx = new std.components.ctx();
 		setContext( ctx );
@@ -2041,6 +2117,40 @@ var iter = 0;
 		var error = new std.components.error( res, this );
 		setPageError( error );
 
+		//Load the data component 
+		var appdata = loadAppDataComponent();
+		if ( !appdata.status )
+			return this.respondWith( 500, appdata );
+		else {
+			appdata = appdata.results;
+			setAppData( appdata );
+		}
+
+		//Serve static pages first and abort
+		if ( Len( pageParts ) > 2 && pageParts[1] == "assets" )
+			return serveStaticResource( pageParts );
+		else if ( Len( pageParts ) == 2 && pageParts[1] == "favicon.ico" ) {
+			//Default choice?
+			var favicon_path = "favicon.ico";
+			if ( StructKeyExists( appdata, "favicon" ) ) {
+				//Get the type
+				var type = getType( appdata.favicon );
+				if ( type.type == "string" )
+					favicon_path = type.value;
+				else if ( type.type == "closure" ) {
+					//Generate the thing by running the function
+					var favicon_data = type.value( this );
+					//return this.respondWith( 200, ... );
+					return this.respondWith( 500, failure( "Favicon by closure not supported yet." ) );	
+				}
+				else {
+					return this.respondWith( 500, failure( "Invalid favicon format." ) );	
+				}
+			}
+
+			return serveStaticResource( pageParts, favicon_path );
+		}
+
 		//Invoke this to load data.cfc. (TODO: Run depending on config settings)
 		//Is being able to choose even necessary...?
 		//var data = new data(); 
@@ -2048,23 +2158,6 @@ var iter = 0;
 		
 		//include data.cfm?
 		//Now I can just run regular stuff
-		try {
-			logReport( "Loading data.cfm..." );
-			include "data.cfm";
-			setAppdata( manifest );
-			//appdata = CreateObject( "component", "data" );
-			appdata = getAppdata();
-
-			//All of the properties in data.cfm (or data.cfc) should
-			//show up here...
-			setUrlBase( appdata.base );
-			logReport( "Success!" );
-		}
-		catch (any e) {
-			logReport( "Failure!" );
-			return this.respondWith( 500, { error="Deserializing data.cfm failed", exception=e, status=false } );
-			abort;
-		}
 
 		/*
 		//Load all of the components here
@@ -2081,14 +2174,18 @@ var iter = 0;
 			return this.respondWith( 500, { error="No routes specified.", exception={}, status=false } );
 		else { 
 			//This can probably fail, but I can't think of how...
-			evaluateRoutingTable( appdata.routes, {} );
-			//renderPage( 500, "Error rebuilding route index.", e );
+			var rtable = evaluateRoutingTable( appdata.routes, {} );
+			if ( !rtable.status ) {
+				return this.respondWith( 500, { error=rtable.message, exception={}, status=false } );
+			}
 
 			//Get the mapped route (handle sending back here) 
 			ctx.route = evaluateRouteData( appdata );
 			if ( !ctx.route.status && StructKeyExists( ctx.route, "exception" ) )
 				return this.respondWith( 500, ctx.route );
-			else if ( !ctx.route.status )
+			else if ( !ctx.route.status && ctx.route.type == 400 )
+				return this.respondWith( 400, ctx.route );
+			else if ( !ctx.route.status && ctx.route.type == 404 )
 				return this.respondWith( 404, ctx.route );
 			else {
 				ctx.setRoute( ctx.route );
@@ -2124,6 +2221,7 @@ var iter = 0;
 			return this.respondWith( 400, ctx.expects );
 		}
 
+		/*
 		//If the query was successful, a response should be sent here.
 		if ( !(ctx.query = evaluateQueryKey( ctx.route ) ).status )
 			return this.respondWith( 500, ctx.query );
@@ -2131,6 +2229,7 @@ var iter = 0;
 			ctx.query = this.extractResults( ctx.query );
 			return this.respondWith( 200, ctx.query );
 		}
+		*/
 		
 		//Check the model
 		if ( !(ctx.model = evaluateModelKey( ctx.route )).status ) {
@@ -2152,11 +2251,19 @@ var iter = 0;
 		else if ( ctx.view.status && StructKeyExists( ctx.view, "results" ) ) {
 			return this.respondWith( 200, ctx.view );
 		}
-		else {
+		else { //if ( !StructIsEmpty( ctx.model ) ) {
 			//No view, and this is supposed to be the case
 			//after
 			//evaluateAfterKey( ctx );
-			return this.respondWith( 200, ctx.model );
+			if ( StructKeyExists( ctx.model, "results" ) ) 
+				return this.respondWith( 200, ctx.model );
+			else {
+				return this.respondWith( 400, { 
+					error = "No resource for #ctx.route.name# found.",
+					status = false,
+					exception = {}
+				});
+			}
 		}
 
 		//There is absolutely no reason to end up here.  Ever.
@@ -2582,7 +2689,7 @@ var iter = 0;
 	//Handles rendering error messages according to the type of content
 	public string function render( struct content ) {
 		if ( this.getResponse().getContentType() == "application/json" ) {
-			return SerializeJSON( content.results ); 
+			return structToJSON( content.results ); 
 		}
 		else if ( this.getResponse().getContentType() == "text/xml" )
 			return SerializeXML( content.results ); 
