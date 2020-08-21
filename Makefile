@@ -22,7 +22,7 @@ SYSTEMD_LIBDIR=/usr/lib/systemd/system
 HTTPDV=httpd-2.4.37
 APRV=apr-1.7.0
 APRUTILV=apr-util-1.6.1
-VERSION=v0.2
+VERSION=v0.3
 CHECK=sed grep wget systemctl
 
 #Lucee specific things
