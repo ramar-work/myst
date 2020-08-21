@@ -39,7 +39,7 @@ TOMCAT_MAX_HEAP=2048
 TOMCAT_CONFIG=$(LP)/tomcat.key
 
 #All the Apache stuff is here
-TEST_PROJECT=faux.local
+TEST_PROJECT=taggart.local
 FILE_BASE=./share/mystinstall
 HTTPD_PREFIX=$(PREFIX)/httpd
 HTTPD_LIBDIR=$(HTTPD_PREFIX)/modules
@@ -297,18 +297,31 @@ lucee-install:
 
 # systemd-init: Prepare systemd files
 systemd-init:
-	echo Installing lupache.service to $(SYSTEMD_LIBDIR)
+	@echo Installing lupache.service to $(SYSTEMD_LIBDIR)
 	@sed "{ \
 		s;@@HTTPD_DIR@@;$(PREFIX)/httpd/bin;; \
 		s/@@USER@@/$(USER)/; \
 		s/@@GROUP@@/$(GROUP)/; \
 	}" $(FILE_BASE)/lupache.service > $(SYSTEMD_LIBDIR)/lupache.service
-	echo Installing myst.service to $(SYSTEMD_LIBDIR)
+	@echo Installing myst.service to $(SYSTEMD_LIBDIR)
 	@sed "{ \
 		s;@@LUCEE_DIR@@;$(PREFIX);; \
 		s/@@USER@@/$(USER)/; \
 		s/@@GROUP@@/$(GROUP)/; \
 	}" $(FILE_BASE)/myst.service > $(SYSTEMD_LIBDIR)/myst.service
+	systemctl daemon-reload
+
+
+# systemd-deinit: Remove and disable any running systemd units having to do with Myst
+systemd-deinit:
+	@echo Uninstalling myst.service... 
+	-@systemctl stop myst
+	-@systemctl disable myst
+	-rm -f /usr/lib/systemd/system/myst.service
+	@echo Uninstalling lupache.service... 
+	-@systemctl stop lupache
+	-@systemctl disable lupache
+	-rm -f /usr/lib/systemd/system/lupache.service
 	systemctl daemon-reload
 
 
@@ -359,10 +372,10 @@ pkg:
 	git archive --format=tar --prefix=myst/ `git tag | tail -n 1` | \
 		gzip > /tmp/$(NAME)-`git tag | tail -n 1`.tar.gz
 
-# pkg - Create new packages for distribution
-pkgmaster:
-	git archive --format=tar --prefix=myst/ apache | \
-		gzip > /tmp/$(NAME).tar.gz
+# pkg - Create a package of the latest dev branch for distribution
+pkgtop:
+	git archive --format=tar --prefix=myst/ dev | \
+		gzip > /tmp/$(NAME)-dev.tar.gz
 
 
 # otn - Switches sites that were previously running coldmvc.cfc as their
