@@ -36,6 +36,7 @@ THIS_SITE=
 SRC=.
 DO_SES=0
 DO_GENVHOST=0
+DO_APACHE_TEST=0
 DO_ACTIVATE=0
 DO_CREATE=0
 UPDATE=0
@@ -229,6 +230,11 @@ do
 			test $CODE -eq -1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
 			test $CODE -eq 1 && VHOST_FILE="$2" || VHOST_FILE=/dev/stdout
 			shift
+		;;
+
+		# Test bundled Apache server config
+		--test)
+			DO_APACHE_TEST=1
 		;;
 
 		# Don't create a git repo
@@ -644,6 +650,13 @@ then
 #	fi	
 fi
 
+# Run a quick Apache config test
+if [ $DO_APACHE_TEST -eq 1 ]
+then
+	$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
+		err "Apache is misconfigured on this system... Can't generate virtualhost."
+	}
+fi
 
 exit 0
 # vim: ff=unix
