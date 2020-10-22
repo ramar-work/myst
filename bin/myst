@@ -577,7 +577,7 @@ then
 	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
 	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" ${DOMAIN:-$NAME}
 	cd $PREFIX
-	ln -s www/${DOMAIN:-$NAME}/misc/apache.vhost virt-hosts-enabled/${DOMAIN:-$NAME} || {
+	ln -s ../www/${DOMAIN:-$NAME}/misc/apache.vhost virt-hosts-enabled/${DOMAIN:-$NAME} || {
 		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
@@ -654,6 +654,7 @@ fi
 if [ $DO_APACHE_TEST -eq 1 ]
 then
 	$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
+		$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG >/dev/null
 		err "Apache is misconfigured on this system... Can't generate virtualhost."
 	}
 fi
