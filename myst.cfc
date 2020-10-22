@@ -78,7 +78,7 @@ accessors=true
 
 	//Relative path maps for framework directories
 	property name="routingKeys" type="string"
-		default="before,after,accepts,expects,filter,returns,namespace,model,view";
+		default="before,after,accepts,expects,filter,returns,namespace";
 	//	default="before,after,accepts,expects,filter,returns,scope,wildcard,inherit";
 
 	//Relative path maps for framework directories
@@ -95,10 +95,10 @@ accessors=true
 	//property name="logString" type="struct";
 	property name="logStyle" type="string" default="standard"; //combined, common,
 	property name="logType" type="string" default="file";
-	property name="logFile" type="string" default="log.txt";
+	property name="logFile" type="string" default="log/log.txt";
 	property name="logFormatCommon" type="string" default="";
 	property name="logFormatCombined" type="string" default="";
-	property name="logFormat" type="string" default="log.txt";
+	property name="logFormat" type="string" default="log/log.txt";
 	property name="runId" type="string" default="";
 
 	//
@@ -693,13 +693,23 @@ accessors=true
 	 * getExtension( ) 
 	 *
    **/
-	private string function getExtension( required string filename ) {
+	public string function getExtension( required string filename ) {
 		var arr = ListToArray(filename, ".");
 		if ( Len(arr) > 1 ) {
 			return arr[ Len(arr) ];	
 		}
 		return "";
 	}
+
+	public string function getNamePart( required string filename ) {
+		var arr = ListToArray(filename, ".");
+		if ( Len(arr) > 1 ) {
+			ArrayDeleteAt( arr, Len(arr) );
+			return ArrayToList( arr, "." );	
+		}
+		return "";
+	}
+
 
 
 	/**
@@ -777,27 +787,13 @@ accessors=true
 
 			//Read the contents
 			SQLContents = FileRead( fp );
-/*
-			//Finally, CFML code could be in there.  Evaluate it.
-			try {
-			SQLContents = Evaluate( SQLContents );
-			}
-			catch (any ee) {
-				return { 
-					status = false
-				 ,message = "#ee#"
-				 ,results = {}
-				};
-			}
-			writedump( SQLContents ); abort;
-*/
 		}
 
 		//Set up a new Query
 		if ( !cQuery )
 			q = new Query( name="#Name#", datasource="#arguments.datasource#" );	
 		else {
-			q = new Query( name="#Name#", dbtype = "query" );
+			q = new Query( name="#Name#", dbtype="query" );
 			q.setAttributes( _mem_ = arguments.query );
 		}
 
@@ -907,7 +903,7 @@ accessors=true
 
 	//Return pretty JSON with the correct casing from one place...
 	//NOTE: This is for one row
-	public String function structToJSON ( Required Struct arg ) {
+	public string function structToJSON ( Required Struct arg ) {
 		function lowerStruct( Struct t ) {
 			var nnStruct = {};
 			for ( var v in t ) {
@@ -1287,15 +1283,84 @@ abort;
 			model[ k ] = c;
 		}
 		//writeoutput( structToJSON( model ) ); abort;		
-		return structToJSON( model );		
+		return this.structToJSON( model );		
 	}
 
-	public struct function failure( required string message, struct exception ) {
+
+	//TODO: Prod boxes should be more selective in what's brought back
+	public struct function lfailure( required numeric status, required string message, struct exception ) {
 		return {
-			status = false,
-			error = message,
-			exception = StructKeyExists( arguments, "exception" ) ? exception : {},
+			status = false
+		, error = message
+		, httpstatus = status
+		, exception = StructKeyExists( arguments, "exception" ) ? exception : {}
 		};
+	}
+
+	/**
+	 * failure( numeric status=500, required string message, struct exception )
+	 *
+   * Short way to call internal server error failures.
+	 **/		
+	public struct function failure( required string message, struct exception ) {
+		return lfailure(
+		  message = message
+		, status = 500
+		, exception = StructKeyExists( arguments, "exception" ) ? exception : {}
+		);
+	}
+
+	
+	/**
+	 * lsuccess( numeric status=500, required string message, struct exception )
+	 *
+   * Short way to call internal server error failures.
+	 **/		
+	public struct function lsuccess( required numeric status, required string message, results ) {
+		return {
+			status = true
+		, httpstatus = status 
+		, message = message
+		, results = StructKeyExists( arguments, "results" ) ? results : {}
+		}
+	}
+
+	/**
+	 * success( numeric status=200, required string message, results )
+	 *
+   * ...
+	 **/		
+	public struct function success( required string message, results ) {
+		return lsuccess(
+		  message = message
+		, status = 200
+		, results = StructKeyExists( arguments, "results" ) ? results : {}
+		);
+	}
+
+	/**
+	 * evaluateClosure ( Required closure )
+	 *
+   * Execute a closure and wrap any errors appropriately
+	 *
+	 **/		
+	private any function evaluateClosure( required funct, struct model ) {
+		var results;
+		try {
+			results = funct( this, StructKeyExists( arguments, "model") ? model : {} );
+		}
+		catch (any e) {
+			return {
+				status = false
+			, error = "Error executing closure."
+			, httpstatus = 500 
+			, exception = e
+			}
+		}
+		return {
+			status = true
+		, results = results
+		}
 	}
 
 
@@ -1312,7 +1377,6 @@ abort;
 		var result = {};
 		var ev;
 		var namespace = StructKeyExists( routedata, "namespace" ) ? routedata.namespace: {};
-//writedump( namespace );writedump( routedata ); abort;
 
 		//Stop if there is no routedata
 		if ( !StructKeyExists( routedata, "model" ) ) {
@@ -1322,9 +1386,8 @@ abort;
 		//Build an array out of whatever value the model may be...
 		if ( ( ev = getType( routedata.model ) ).type != 'array' && ev.type != 'struct' )
 			ArrayAppend( pgArray, { type=ev.type, value=ev.value } );
-		else if ( ev.type == 'struct' ) {
+		else if ( ev.type == 'struct' )
 			return failure( "Models as structs are not yet supported (check key at #routedata.file#)." ); 
-		}
 		else {
 			for ( var ind=1; ind<=ArrayLen(ev.value); ind++ ) {
 				var ee = ev.value[ ind ]; 
@@ -1341,14 +1404,44 @@ abort;
 
 		//Now load each model, should probably put these in a scope
 		for ( var page in pgArray ) {
+			//Do all of that basic stuff... such as...
+	
+			//defining all vars
+			//get/set the namespace
+			var cexec;
+			var nsref; 
+			var path;
+
+			//first condition should check if we even continue
+
+			//subsequent conditions need to check for death...
+
 			//Model can be a struct too, this automatically puts things in things...
-			if ( page.type == "struct" ) {
+			if ( page.type == "struct" /*catch other types?*/ ) {
 				return failure( "Models as structs currently aren't supported." );
 			}
+			else if ( page.type == "closure" ) {
+				if ( !( cexec = evaluateClosure( page.value, result ) ).status )
+					return cexec;
+				else {
+					//TODO: this can easily be 
+					if ( gettype( cexec.results ).type != "struct" )
+						StructInsert( result, nsref, cexec.results );
+					else {
+						for ( var k in cexec.results ) {
+							if ( !StructKeyExists( getAppdata(), "ignoreConflicts" ) || !getAppdata().ignoreConflicts )
+								StructInsert( result, k, cexec.results[ k ] );
+							else if ( !StructKeyExists( result, k ) )
+								StructInsert( result, k, cexec.results[ k ] );
+							else {
+								return failure( "Encountered duplicate key '#k#' when evaluating model #csref#" ); 	
+							}
+						}
+					}
+				}
+			}
 			else if ( page.type == "string" ) {
-				var cexec;
-				var path = "#getRootDir()#app/#page.value#";
-				var nsref; 
+				path = "#getRootDir()#app/#page.value#";
 
 				//Use either namespace or basename to identify the model when more than one is in use...
 				if ( StructKeyExists( namespace, page.value ) )
@@ -1358,15 +1451,33 @@ abort;
 					var pv = ListToArray( page.value, "/" );
 					nsref = pv[ Len( pv ) ];	
 				}
-//writedump( nsref ); abort;
 
 				if ( !FileExists("#path#.cfc") && !FileExists("#path#.cfm") )
 					return failure( "Could not locate requested model file '#page.value#.cf[cm]' for key 'default'" );
 				else if ( FileExists( "#path#.cfc" ) ) {
-					if ( !( cexec = invokeComponent( "app.#page.value#", result )).status )
+					//Try to evaluate the model file, if it fails, let the user know why 
+					if ( !( cexec = invokeComponent( "app.#page.value#", result )).status ) {
 						return cexec;
+					}
+					//Model splitting is now done manually...
 					else {
-						result[ nsref ] = cexec.results;
+						//TODO: Should I still support the split evaluation model?
+						//result[ nsref ] = cexec.results;
+						//TODO: Should a status of false just kill everything?
+						//if the type is anything besides a struct, it needs a name 
+						if ( gettype(cexec.results).type != "struct" )
+							StructInsert( result, nsref, cexec.results );
+						else {
+							for ( var k in cexec.results ) {
+								if ( !StructKeyExists( getAppdata(), "ignoreConflicts" ) || !getAppdata().ignoreConflicts )
+									StructInsert( result, k, cexec.results[ k ] );
+								else if ( !StructKeyExists( result, k ) )
+									StructInsert( result, k, cexec.results[ k ] );
+								else {
+									return failure( "Encountered duplicate key '#k#' when evaluating model #csref#" ); 	
+								}
+							}
+						}
 					}
 				}
 				else { //if ( FileExists( "#path#.cfm" ) ) {
@@ -1450,17 +1561,21 @@ abort;
 	/**
    * Wrap loading components to catch any errors.
 	 */
-	private any function invokeComponent( string cname, model ) {
+	private any function invokeComponent( required string cname, model ) {
 		var comp;
+	  var _model = StructKeyExists( arguments, "model" ) ? model : {};
 		try {
-			comp = createObject( "component", cname ).init( this, model );
+			comp = createObject( "component", cname ).init( this, _model ); 
 		}
 		catch (any e) {
-			return failure( e.message, e ); 
+			return failure(
+			  exception = e
+			, message = "While attempting to open #cname#. #e.message#"
+			);
 		}
 		return {
-			status = true,
-			results = comp
+			status = true
+		, results = comp
 		}
 	}
 
@@ -1501,12 +1616,12 @@ abort;
 					var vv = Replace( q.name, ".cfc", "" );
 					//var cname = Replace( q.name, ".cfc", "" );
 					componentStruct[ cname ] = createObject( "component", "components.#cname#" ).init(
-							mystObject = this 
-						, realname = cname
-						, namespace = cname
-						, datasource = datasource
-						, debuggable = 0
-						, verbose = 0
+						mystObject = this 
+					, realname = cname
+					, namespace = cname
+					, datasource = datasource
+					, debuggable = 0
+					, verbose = 0
 					);
 				}
 				logReport("Successfully loaded component #q.name#!");
@@ -1533,22 +1648,32 @@ abort;
 	 */
 	private Struct function appendIndependentRoutes ( data ) {
 		logReport("Loading independent routes...");
+
 		try {
 			//Add more to logging
-			var dirQuery = DirectoryList( "routes", false, "query", "*.cfm" );
+			var dirQuery = DirectoryList( "routes", false, "query", "*.cfc" );
 			var callstat = 0;
+			var routes = {};
+
 			for ( var q in dirQuery ) {
-				var n = Replace( q.name, ".cfm", "" );
-				if ( !( callstat = _include( where = "routes", name = n ) ).status ) {
-					return failure( "Syntax error at routes/#n#", callstat.errors );
-				}
+				//...
+				if ( q.name neq "Application.cfc" ) {
+					var name = Replace( q.name, ".cfc", "" );
+					var comp = invokeComponent( "routes.#name#" );
+					if ( !comp.status )
+						return comp; //failure( "Route injection failed: #comp.message#", comp );
+					else {
+						StructAppend( routes, comp.results ); 
+					}
+				} 
 			}
 			logReport("SUCCESS - All routes loaded!");
-			return StructNew();
+			return { status=true, results=routes };
 		}
 		catch (any e) {
-			return failure( "Route injection failed.", e );
+			return failure( message="Route injection failed.", exception=e );
 		}
+		return { status=true, results={} };
 	}
 
 
@@ -1567,8 +1692,6 @@ abort;
 	 * This is supposed to turn my routing table into something else.
 	 **/
 	private function evaluateRoutingTable( Required Struct arg, Struct found, key = "__TOP__" ) {
-//writeoutput( "Evaluating at level '#key#'<br />" );
-
 		var a;
 		try {
 			var nStruct = {};
@@ -1610,9 +1733,6 @@ abort;
 							, message=  "router inheritance failed."
 							}
 						}
-						
-//writeoutput( "after transform:<br>" );	
-//writedump( y.results );	
 					}
 				}
 
@@ -1694,6 +1814,7 @@ abort;
 		var depth = 0;
 		var route = data.routes;
 		var paths = ListToArray( localName, "/" );
+		var parts = [];
 		ArrayDeleteAt( paths, Len( paths ) );
 		//Do you want to match literally? Or match using regex, at a specific level?
 
@@ -1703,6 +1824,7 @@ abort;
 				route = route[ filepath ];
 				path = ListAppend( path, filepath, "/" );
 				file = filepath;
+				ArrayAppend( parts, { name=filepath, regex=false } );
 			}
 			else {
 				//No simple matches were found, so run against any regexes
@@ -1757,11 +1879,13 @@ abort;
 					, file=filepath
 					};
 				}
+				ArrayAppend( parts, { name=filepath, regex=true } );
 			}
 		}
 
 		var diff = 	Len(path) - Len(file);
 		route.file = file;
+		route.info = parts;
 		route.path = ( diff ) ? Left( path, diff ) : path; 
 		route.status = true;
 		route.name = "/#ArrayToList( paths, "/" )#";
@@ -1997,7 +2121,7 @@ abort;
 	 * ...
 	 *
 	 **/
-	private function serveStaticResource( required array parts, string path ) {
+	public function serveStaticResource( required array parts, string path, string err ) {
 		try {
 			var spath;
 			var metadata;
@@ -2016,7 +2140,9 @@ abort;
 
 			//If the file does not exist, send a 404
 			if ( !FileExists( spath ) ) {
-				return this.sendResponse( 404, "text/html", "Error 404: File '#spath#' not found" );
+				var str = StructKeyExists( arguments, "err" ) 
+					? arguments.err : "Error 404: File '#spath#' not found";
+				return this.sendResponse( 404, "text/html", str );
 			}
 
 			//If you have problems accessing it, send a 403
@@ -2025,7 +2151,7 @@ abort;
 				return this.sendResponse( 403, "text/html", "Error: Access Forbidden" );	
 			}
 
-			extension = this.GetExtension( spath );
+			extension = this.getExtension( spath );
 			if ( extension eq "" || !StructKeyExists( getCommonExtensionsToMimeTypes(), extension ) )
 				mimetype = "application/octet-stream"; 
 			else {
@@ -2159,29 +2285,36 @@ abort;
 		//include data.cfm?
 		//Now I can just run regular stuff
 
-		/*
-		//Load all of the components here
-		if ( !appdata.bypassComponents && !( ctx.components = loadComponents( this )).status )
+		//Load all of the components here /*!appdata.bypassComponents && */
+		if ( !( ctx.components = loadComponents( this )).status ) {
+writedump( ctx.components ); abort;
 			return this.respondWith( 500, ctx.components );
-		*/
-
-		//Route injection happens here.
-		var r = appendIndependentRoutes( appdata );
-		//writedump(r);
+		}
+		else {
+			ctx.components = ctx.components.results;
+		}
 
 		//This ought to return a machine code friendly struct with route eval data
 		if ( !StructKeyExists( appdata, "routes" ) ) 
-			return this.respondWith( 500, { error="No routes specified.", exception={}, status=false } );
-		else { 
+			return this.respondWith( 500, failure( "No routes specified." ) );
+		else {
+			var rtable; 
+			var r;
+			//Route injection happens here.
+			if ( !( r = appendIndependentRoutes( appdata ) ).status )
+				return this.respondWith( 500, r );
+			else {
+				StructAppend( appdata.routes, r.results ); 
+			}
+			
 			//This can probably fail, but I can't think of how...
-			var rtable = evaluateRoutingTable( appdata.routes, {} );
-			if ( !rtable.status ) {
-				return this.respondWith( 500, { error=rtable.message, exception={}, status=false } );
+			if ( !( rtable = evaluateRoutingTable( appdata.routes, {} ) ).status ) {
+				return this.respondWith( 500, failure( rtable.message ) );
 			}
 
 			//Get the mapped route (handle sending back here) 
-			ctx.route = evaluateRouteData( appdata );
-			if ( !ctx.route.status && StructKeyExists( ctx.route, "exception" ) )
+			if ( !(ctx.route = evaluateRouteData( appdata )).status && StructKeyExists( ctx.route, "exception" ) )
+			//if ( !ctx.route.status && StructKeyExists( ctx.route, "exception" ) )
 				return this.respondWith( 500, ctx.route );
 			else if ( !ctx.route.status && ctx.route.type == 400 )
 				return this.respondWith( 400, ctx.route );
@@ -2230,11 +2363,10 @@ abort;
 			return this.respondWith( 200, ctx.query );
 		}
 		*/
-		
+	
 		//Check the model
-		if ( !(ctx.model = evaluateModelKey( ctx.route )).status ) {
+		if ( !(ctx.model = evaluateModelKey( ctx.route )).status )
 			return this.respondWith( 500, ctx.model );
-		}
 		else if ( StructKeyExists( ctx.model, "results" ) ) {
 			//ctx.model = this.extractResults( ctx.model );
 			setModel( ctx.model.results );
@@ -2245,18 +2377,19 @@ abort;
 		//if ( !(ctx.filter = evaluateFilterKey( ctx.route )).status )
 		//	this.respondWith( 500, error.render( ctx.filter ) );
 		//View interpretation can fail
-		if ( !(ctx.view = evaluateViewKey( ctx.route, ctx.model )).status ) {
+		if ( !(ctx.view = evaluateViewKey( ctx.route, ctx.model )).status )
 			return this.respondWith( 500, ctx.view );
-		}
-		else if ( ctx.view.status && StructKeyExists( ctx.view, "results" ) ) {
+		else if ( ctx.view.status && StructKeyExists( ctx.view, "results" ) )
 			return this.respondWith( 200, ctx.view );
-		}
 		else { //if ( !StructIsEmpty( ctx.model ) ) {
 			//No view, and this is supposed to be the case
 			//after
 			//evaluateAfterKey( ctx );
-			if ( StructKeyExists( ctx.model, "results" ) ) 
+			//httpstatus - needs to check for number of children, if it's just one, then something
+			if ( StructKeyExists( ctx.model, "results" ) )
 				return this.respondWith( 200, ctx.model );
+			else if ( StructKeyExists( ctx.model, "httpstatus" ) )
+				return this.respondWith( 500, { status=false, message="so much failure." } );
 			else {
 				return this.respondWith( 400, { 
 					error = "No resource for #ctx.route.name# found.",
@@ -2325,17 +2458,19 @@ abort;
 		// gte
 		// eq	
 		// neq 
-
 	}
 
+
 	//Check a struct for certain values by comparison against another struct
-	public function cmValidate ( cStruct, vStruct ) {
+	public struct function validate ( cStruct, vStruct ) {
 		var s = { status=true, message="", results=StructNew() };
 
 		//Loop through each value in v
-		for ( key in vStruct ) {
+		for ( var key in vStruct ) {
 			//Short names
-			vk = vStruct[ key ];
+			var ck;
+			var tt;
+			var vk = vStruct[ key ];
 
 			//If key is required, and not there, stop
 			if ( structKeyExists( vk, "req" ) ) {
@@ -2344,10 +2479,15 @@ abort;
 				}
 			}
 
+
 			//No use moving forward if the key does not exist...
 			if ( !structKeyExists( cStruct, key ) ) {
 				//Use the 'none' key to set defaults on values that aren't required
 				if ( StructKeyExists( vk, "ifNone" ) ) {
+					if ( StructKeyExists( vk, "type" ) && ( !(t = getType(vk.ifNone)).status || t.type neq vk.type ) ) {
+						return { status = false, message = "type does not match.", results = {} };
+					//return failure( "type of value received at key '#key#' is not #vk.type#." );
+					}
 					s.results[ key ] = vk[ "ifNone" ];	
 				} 
 				continue;
@@ -2441,9 +2581,7 @@ abort;
 				}
 			
 				//Upload the file
-				file = upload_file( ck, acceptedMimes );
-
-				if ( file.status ) {
+				if ( ( file = upload_file( ck, acceptedMimes ) ).status ) {
 					//Check extensions if acceptedMimes is not a wildcard
 					if ( acceptedExt neq 0 ) {
 						if ( !listFindNoCase( acceptedExt, file.results.serverFileExt ) ) {
@@ -2689,7 +2827,7 @@ abort;
 	//Handles rendering error messages according to the type of content
 	public string function render( struct content ) {
 		if ( this.getResponse().getContentType() == "application/json" ) {
-			return structToJSON( content.results ); 
+			return this.structToJSON( content.results ); 
 		}
 		else if ( this.getResponse().getContentType() == "text/xml" )
 			return SerializeXML( content.results ); 
@@ -2701,26 +2839,33 @@ abort;
 
 
 	//Return a message
-	public boolean function respondWith( numeric status, struct con ) {
+	public boolean function respondWith( numeric status = 200, struct con ) {
 		//A String buffer goes here... not sure how fast this is...
 		var contentBuffer;
+		var httpstatus; 
+
+		if ( StructKeyExists( con, "httpstatus" ) )
+			httpstatus = con.httpstatus;
+		else if ( StructKeyExists( con, "results" ) && IsStruct( con.results ) )
+			httpstatus = StructKeyExists( con.results, "httpstatus" ) ? con.results.httpstatus :status;
+		else {
+			httpstatus = status;
+		}
 
 		//If status is invalid, return a failure
-		if ( !status || status < 100 || status > 599 ) {
+		if ( httpstatus < 100 || httpstatus > 599 )
 			contentBuffer = "Attempted to return invalid code #status#";
-		}
 		else if ( StructKeyExists( con, "status" ) && !con.status ) {
 			var error = getPageError();
-			error.setStatus( status );
-			error.setStatusMessage( getHttpHeaders()[ status ] );
+			error.setStatus( httpstatus );
+			error.setStatusMessage( getHttpHeaders()[ httpstatus ] );
 			contentBuffer = error.render( con ); 
 		}
 		else {
 			contentBuffer = this.render( con );
 		}
-		var res = getResponse();	
-		this.sendResponse( status, res.getContentType(), contentBuffer );
-		//res.send( status, res.getContentType(), contentBuffer );
+
+		this.sendResponse( httpstatus, getResponse().getContentType(), contentBuffer );
 		return true;
 	} 
 

@@ -1,30 +1,21 @@
-#!/bin/bash -
+#!/bin/sh -
 # -------------------------------------------- #
 # myst.sh
 #
 # Summary
 # -------
-# An administration interface for Myst sites.
+# A CLI administration interface for Myst sites.
 #
 # Author
 # ------
-#	Antonio R. Collins II (ramar.collins@gmail.com, rc@tubularmodular.com)
-# Copyright 2016-Present, Tubular Modular
+#	Antonio R. Collins II (ramar@collinsdesign.net)
+# Copyright 2016 - Present, Tubular Modular Inc dba Collins Design
 # Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 # 
 # Usage
 # -----
 # TBD
 # 	
-# TODO
-# ----
-# - Output a production ready package?
-#	- Be able to build from JSON, XML, or something
-# - Handle setup tasks and tooling ( like database connections and maintenance ) 
-# - Convert cli scripts to Java, C or C++
-# - Make sure user matches server user
-# - Add options for SSL (since the cert may be involved at Tomcat's level) 
-#
 # -------------------------------------------- #
 
 # const 
@@ -333,7 +324,7 @@ then
 	else 
 		# Names have always got to be specified
 		[ -z $NAME ] && err "No site name specified."
-
+echo $HTTPD_PREFIX/bin/httpd
 		$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
 			err "Apache is misconfigured on this system... Can't get config..."
 		}
@@ -377,23 +368,21 @@ EOF
 
 	# Set up a new Myst instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Create $PNAME application folders...\n"
-	mkdir $MKDIR_FLAGS $DIR/{api,app,assets,components,db,files,log,misc,overrides,routes,setup,sql,std,views}/
+	mkdir $MKDIR_FLAGS $DIR/{app,assets,components,db,files,log,misc,overrides,routes,setup,sql,std,views}/
 	mkdir $MKDIR_FLAGS $DIR/assets/{css,img,js}/
-	mkdir $MKDIR_FLAGS $DIR/db/static/
-	mkdir $MKDIR_FLAGS $DIR/std/custom/
-	mkdir $MKDIR_FLAGS $DIR/std/components/
+	#mkdir $MKDIR_FLAGS $DIR/db/static/
+	mkdir $MKDIR_FLAGS $DIR/std/{base,custom,components}/
 
 
 	# Populate the new instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Populating new $PNAME instance...\n"
-	cp $CP_FLAGS $SHAREDIR/{Application.cfc,$SYMNAME.cfc,index.cfm,data.cfm,data.cfm.example} $DIR/
-	cp $CP_FLAGS $SHAREDIR/app-default.cfm $DIR/app/default.cfm
+	cp $CP_FLAGS $SHAREDIR/{Application.cfc,$SYMNAME.cfc,index.cfm,data.cfm} $DIR/
+	cp $CP_FLAGS $SHAREDIR/app-default.cfc $DIR/app/default.cfc
 	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
-	cp $CP_FLAGS $SHAREDIR/failure.cfm $DIR/std/
-	cp $CP_FLAGS $SHAREDIR/setup.cfm $DIR/api/
-	cp $CP_FLAGS $SHAREDIR/{4xx,5xx,mime,html}-view.cfm $DIR/std/
+	cp $CP_FLAGS $SHAREDIR/error.cfm $DIR/std/
+	cp $CP_FLAGS $SHAREDIR/model.cfc $DIR/std/base/
 	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/
-	cp $CP_FLAGS $SHAREDIR/base.cfc $DIR/components/
+	touch $DIR/_.cfm
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
@@ -484,7 +473,7 @@ then
 	# Right now, the user will need to look before he/she leaps and merge Application.cfc manually
 	cp $CP_FLAGS /tmp/myst/share/Application.cfc $DIR/Application.cfc.new
 	# Also explicitly copy the new base.cfc
-	cp $CP_FLAGS /tmp/myst/share/base.cfc $DIR/components/
+	#cp $CP_FLAGS /tmp/myst/share/base.cfc $DIR/components/
 	rm -rf /tmp/myst/
 	exit 0
 fi
@@ -686,23 +675,23 @@ then
 	}
 
 	# Check that it's not the same
-	RENAME=0
-	if [ ! -f $DIR/app/default.cfm ]
-	then
-		RENAME=1	
-	else
-		DESTFILE=`sum $DIR/app/default.cfm | awk '{ print $1 }'`
-		SRCFILE=`sum $PREFIX/share/myst/app-default.cfm | awk '{ print $1 }'`
-		[ $DESTFILE -eq $SRCFILE ] && RENAME=1
-	fi
-
-	if [ $RENAME -eq 1 ]
-	then
-		# [[ `cat $DIR/app/default.cfm` == `cat $PREFIX.cfm` ]] 
-		mv $MV_FLAGS $DIR/app/default.cfm $DIR/app/_default.cfm
-		mv $MV_FLAGS $DIR/views/default.cfm $DIR/views/_default.cfm
-		touch $DIR/{app,views}/default.cfm
-	fi	
+#	RENAME=0
+#	if [ ! -f $DIR/app/default.cfm ]
+#	then
+#		RENAME=1	
+#	else
+#		DESTFILE=`sum $DIR/app/default.cfm | awk '{ print $1 }'`
+#		SRCFILE=`sum $PREFIX/share/myst/app-default.cfm | awk '{ print $1 }'`
+#		[ $DESTFILE -eq $SRCFILE ] && RENAME=1
+#	fi
+#
+#	if [ $RENAME -eq 1 ]
+#	then
+#		# [[ `cat $DIR/app/default.cfm` == `cat $PREFIX.cfm` ]] 
+#		mv $MV_FLAGS $DIR/app/default.cfm $DIR/app/_default.cfm
+#		mv $MV_FLAGS $DIR/views/default.cfm $DIR/views/_default.cfm
+#		touch $DIR/{app,views}/default.cfm
+#	fi	
 fi
 
 

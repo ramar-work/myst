@@ -1,7 +1,4 @@
-html,
-body,
-div 
-{ 
+html, body, div { 
 	padding: 0; 
 	margin: 0;
 	padding: 0;
@@ -13,8 +10,7 @@ div
 }
 
 
-.fixed-header
-{
+.fixed-header {
 	position: fixed;
 	display: flex;
 	padding-top: 5px;
@@ -37,8 +33,7 @@ div
 #fixed-header
 { /*display: none;*/ }
 
-table, th, tr, td
-{
+table, th, tr, td {
 	border: 1px solid black;
 	text-align: left;
 	font-weight: bold;
@@ -49,8 +44,7 @@ th.key, th.type { width: 15%; }
 th.value { width: 80%; }
 
 a.nav
-,a.nav:visited
-{
+,a.nav:visited {
 	font-size: 0.75em;
 	margin-right: 20;
 	color: black;
@@ -81,28 +75,24 @@ h1 { font-size: 2.2em; font-weight: bold; }
 h2 { font-size: 1.8em; font-weight: bold; }
 h3 { font-size: 1.5em; font-weight: bold; }
 
-.container
-{
+.container {
 	position: relative;
 	width: 70%;
 	left: 15%;
 }
 
-.dd 
-{
+.dd {
 	border-top: 1px solid black;
 	border-bottom: 1px solid black;
 	position: relative;
 	margin-top: 10px;
 }
 
-.jazzy 
-{
+.jazzy {
 	width: 100%;
 }
 
-.top
-{
+.top {
 	margin: 0;
 	padding: 0;
 	display: flex;
@@ -117,19 +107,16 @@ h3 { font-size: 1.5em; font-weight: bold; }
 	border: 0;
 }
 
-p
-{
+p {
 	margin-bottom:  20px;
 	padding-bottom: 20px;
 }
 
-div.break
-{
+div.break {
 	border-bottom:  2px solid black;
 }
 
-p.subheading
-{
+p.subheading {
 	margin-bottom:  20px;
 	padding-bottom: 20px;
 	border-bottom:  2px solid white;
@@ -139,9 +126,7 @@ p.subheading
 }
 
 /*media query*/
-pre,
-code
-{
+pre,code {
 	overflow: hidden;
 	background-color: #d6e4f9;
 	/*font-size: 1.2vw;*/
@@ -152,8 +137,7 @@ code
 }
 
 
-.logo 
-{
+.logo {
 	text-align: center;
 	font-size: 3em;
 	font-family: "Shrikhand", cursive;
@@ -168,8 +152,7 @@ code
 	*/
 }
 
-.top-data
-{
+.top-data {
 	font-size: 1em;	
 	flex: center;
 	margin: 0 auto;
@@ -182,9 +165,7 @@ code
 { color: #aaa; }
 
 
-ul,
-li.brill
-{
+ul, li.brill {
 	margin: 0;
 	padding: 0;
 	border: 0;
@@ -195,8 +176,7 @@ li.brill
 }
 
 
-li.brill
-{
+li.brill {
 	position: relative;
 	display:  inline-block;
 	width:    30%;
@@ -212,16 +192,14 @@ li.brill
 	margin-bottom: 10px;
 }
 
-.flexload 
-{
+.flexload {
 	display: flex;
 	height: 100px;
 	align-items: center;
 	justify-content: center;
 }
 
-.half
-{
+.half {
 	align-items: center;
 	padding-top: 30px;
 	padding-bottom: 30px;
@@ -231,9 +209,7 @@ li.brill
 	transition: background-color 0.3s;
 }
 
-.gh, 
-.ph
-{
+.gh, .ph {
 	/*
 	transition: background-position 0.3s;
 	*/
@@ -255,22 +231,19 @@ li.brill
 	background-image: url("Package2.png");
 }
 
-.gh:hover,
-.ph:hover
-{
+.gh:hover,.ph:hover {
 	background-size: 60%;
 	background-position: -40% 40%;
 }
 
 a.half-link { 
-font-weight: bold;
-background-color: black; 
-color: white; 
-padding: 5px;
+	font-weight: bold;
+	background-color: black; 
+	color: white; 
+	padding: 5px;
 }
 
-.half:hover
-{
+.half:hover {
 /*	background-color: #ffff99;*/
 	background-color: #e6ffff;
 }

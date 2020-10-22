@@ -3,24 +3,18 @@
 # mystmod.sh
 #
 # @author
-#		Antonio R. Collins II (rc@tubularmodular.com, ramar.collins@gmail.com)
+#	Antonio R. Collins II (ramar@collinsdesign.net)
 #
 # @copyright
-# 	Copyright 2016-Present, "Tubular Modular"
-# 	Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+# Copyright 2016-Present, Tubular Modular Inc dba Collins Design
+# Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 # 
 # @summary
-# 	A way to create new "plugins"
+# A way to create new "plugins"
 #
 # @usage
-# 	
-#
-# 
-# @todo
-#		- Be able to build from JSON
-# 	- Handle setup tasks and tooling ( like database connections and maintenance ) 
-# 	- Convert to Java or C++
-#		- Download "modules" via some web site somewhere and place them into this chain
+# TBD
+#  	
 # -------------------------------------------- #
 
 # Variable list
@@ -591,9 +585,6 @@ then
 	# Finally, tarball this and copy over the original repository (which should be a git repo) 
 	# I have to choose a repo type (the web is going to be the best choice)
 	# tar cf - /tmp/$MODNAME # | tar xf - -C $REPO/
-
 fi
 exit 0
-
-#cp $SRC/share/apache_htaccess $DIR/.htaccess
 # vim: ff=unix

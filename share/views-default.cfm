@@ -1,5 +1,4 @@
 <!---
-/* ---------------------------------------------- *
 views-default.cfm
 =================
 
@@ -16,8 +15,6 @@ Summary
 -------
 Default 'It Works!' style page for successful 
 myst deployments. 
-
- * ---------------------------------------------- */
   --->
 <html>
 
@@ -201,7 +198,6 @@ ul li {
 
 
 <body>
-<cfset model = #getModel().default#>
 <cfoutput>
 	<div class="container">
 		<div class="container-section">

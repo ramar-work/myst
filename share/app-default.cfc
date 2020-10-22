@@ -2,17 +2,14 @@
 default.cfc
 ===========
 
-Author
-------
+@author
 Antonio R. Collins II (ramar@collinsdesign.net)
 
-Copyright
----------
-Copyright 2016-Present, Tubular Modular, Inc dba Collins Design
+@copyright
+2016 - Present, Tubular Modular Inc dba Collins Design
 Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 
-Summary
--------
+@summary
 Example model file	
 
  * ---------------------------------------------- */
