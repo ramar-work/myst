@@ -231,6 +231,11 @@ do
 			shift
 		;;
 
+		# Test bundled Apache server config
+		--test)
+			DO_APACHE_TEST=1
+		;;
+
 		# Don't create a git repo
 		--no-git)
 			NO_GIT=1
@@ -644,6 +649,13 @@ then
 #	fi	
 fi
 
+# Run a quick Apache config test
+if [ $DO_APACHE_TEST -eq 1 ]
+then
+	$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
+		err "Apache is misconfigured on this system... Can't generate virtualhost."
+	}
+fi
 
 exit 0
 # vim: ff=unix
