@@ -371,7 +371,7 @@ then
 	test ! -z $MODNAME || err "No module name specified." 1
 	test ! -z $DIR || err "No directory specified." 1
 
-	mkdir -pv $DIR/{api,app,components,db,misc,overrides,setup,sql,std,views}/$MODNAME/
+	mkdir -pv $DIR/{app,components,db,misc,overrides,setup,sql,views}/$MODNAME/
 	mkdir -pv $DIR/assets/{css,js,img}/$MODNAME/
 	mkdir -v $DIR/routes/
 
@@ -395,9 +395,9 @@ then
 	mv -v $DIR/{Makefile,README.md} $DIR/misc/$MODNAME/
 	mv -v $DIR/components/standard.cfc $DIR/components/$MODNAME.cfc
 
-	sed "{
-		s/__NAMESPACE__/$MODNAME/g;
-	}" $SRCDIR/share/myst/$PROGRAM_NAME/modroute.cfm > $DIR/routes/$MODNAME.cfm
+#	sed "{
+#		s/__NAMESPACE__/$MODNAME/g;
+#	}" $SRCDIR/share/myst/$PROGRAM_NAME/modroute.cfm > $DIR/routes/$MODNAME.cfm
 
 	if [ $NO_GIT -eq 0 ]
 	then	
@@ -498,8 +498,9 @@ then
 		# Distinguish between files and stuff
 		cd $MODPATH/$MODNAME
 		[ $VERBOSE -eq 1 ] && TARFLAGS="--verbose" || TARFLAGS=	
-		git archive --format tar HEAD | tar xf - $TARFLAGS --exclude=.gitignore -C $FOLDER/
-		#tar cf - . | tar xf - --verbose -C $FOLDER/
+		#git archive --format tar HEAD | tar xf - $TARFLAGS --exclude=.gitignore -C $FOLDER/
+		#echo untarring $MODPATH/$MODNAME to $FOLDER/
+		tar cf - . | tar xf - --verbose -C $FOLDER/
 		cd -
 	fi
 fi

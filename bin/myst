@@ -324,7 +324,6 @@ then
 	else 
 		# Names have always got to be specified
 		[ -z $NAME ] && err "No site name specified."
-echo $HTTPD_PREFIX/bin/httpd
 		$HTTPD_PREFIX/bin/httpd -t -D DUMP_RUN_CFG > /dev/null 2>/dev/null || {
 			err "Apache is misconfigured on this system... Can't get config..."
 		}
