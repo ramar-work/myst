@@ -15,7 +15,9 @@
 # Usage
 # -----
 # TBD
-# 	
+# 
+# TODO
+# - Add the ability to initialize SSL from here. 	
 # -------------------------------------------- #
 
 # const 
@@ -167,14 +169,26 @@ do
 		# Administration stuff
 		-c|--create)
 			DO_CREATE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			shift
+			NAME="$1"	
 		;;
 
 		-e|--enable)
 			DO_ENABLE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			shift
+			NAME="$1"
 		;;
 
 		-x|--disable)
 			DO_DISABLE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			shift
+			NAME="$1"
 		;;
 
 		# Administration stuff
@@ -186,13 +200,13 @@ do
 			DIR="$1"
 		;;
 
-		# Turn off the 'default' that ships
+		# Activate a site per Apache
 		-a|--activate)
 			DO_ACTIVATE=1
-#			CODE=`detFlag "$2"`;
-#			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
-#			shift
-#			THIS_SITE="$1"
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			shift
+			NAME="$1"
 		;;
 
 		# Enable the capacity to serve SES URLs via server configuration
@@ -540,12 +554,6 @@ then
 		s;@@DATE@@;$( date );;
 	}" $SHAREDIR/default.vhost > $VHOST_FILE 
 
-	# Link to virtual-hosts (this is going to work differently on production)
-#	ln -s $VHOST_FILE $PREFIX/virt-hosts-available/$NAME || {
-#		printf "Failed to create the folder?"
-		#This should be deleted?
-#	}
-
 	# Lastly, if this is a CREATE run and we haven't done any work, add this file too. 
 	if [ $DO_CREATE -eq 1 ] && [ -d $DIR/.git/ ] 
 	then
@@ -557,69 +565,13 @@ then
 fi
 
 
-# Activate a host (for old sites, or previously disabled ones)
-if [ $DO_ACTIVATE -eq 1 ]
-then
-	# Did we call DO_CREATE?
-	if [ -z "$VHOST_FILE" ]
-	then
-		#In this case, I have to specify a Domain or Name 
-		[ -z "${DOMAIN:-$NAME}" ] && err "No site domain or name specified."
-
-		#If this is not done, figure it out
-		if [ -z "$DIR" ]
-		then
-			# Absolute directories can be specified, but aren't needed anymore.
-			DIR=$HTTPD_PREFIX/htdocs/${DOMAIN:-$NAME}
-
-			# Check for domain and/or name?
-			[ $VERBOSE -eq 1 ] && printf "Activating site '%s'\n" ${DOMAIN:-$NAME}
-		fi
-		VHOST_FILE=$DIR/misc/apache.vhost
-	fi
-
-	# If this file doesn't exist for whatever reason, it's a problem.
-	if [ ! -f "$VHOST_FILE" ]
-	then
-		mkdir $DIR/misc/ || {
-			printf "Could not create configuration directory for specified instance at: $DIR" > /dev/stderr
-			exit 1
-		}
-
-		# Call yourself and create it
-		$0 --virtual-host - > $VHOST_FILE || {
-			printf "Could not create new virtual host for instance at: $DIR" >/dev/stderr
-			exit 1
-		}
-	fi
-
-	# This file ought to exist now, but something can still go wrong		
-	#echo ln -s $VHOST_FILE $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} 
-	cd $PREFIX
-	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
-	ln -s ../www/${DOMAIN:-$NAME}/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME} || {
-		printf "Failed to enable site at: $DIR"
-		exit 1	
-	}
-	cd - >/dev/null
-fi
-
-
 # Enable hosts 
 if [ $DO_ENABLE -eq 1 ]
 then
 	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
-
 	[ $VERBOSE -eq 1 ] && printf "Enabling site '%s'\n" ${DOMAIN:-$NAME}
-
-#	ln -s $PREFIX/virt-hosts-available/${DOMAIN:-$NAME} $PREFIX/virt-hosts-enabled/ || {
-#		printf "Failed to enable site: %s." ${DOMAIN:-$NAME}
-#		exit 1	
-#	}
-
 	cd $PREFIX
-	#echo ln -s www/misc/apache.vhost virt-hosts-available/${DOMAIN:-$NAME}
-	ln -s ../virt-hosts-available/${DOMAIN:-$NAME} virt-hosts-enabled/${DOMAIN:-$NAME} || {
+	ln -s www/${DOMAIN:-$NAME}/misc/apache.vhost virt-hosts-enabled/${DOMAIN:-$NAME} || {
 		printf "Failed to enable site at: $DIR"
 		exit 1	
 	}
@@ -632,7 +584,7 @@ if [ $DO_DISABLE -eq 1 ]
 then
 	[ -z "${DOMAIN:-$NAME}" ] && err "No site or domain specified."
 	[ $VERBOSE -eq 1 ] && printf "Disabling site '%s'\n" ${DOMAIN:-$NAME}
-	echo rm -f $PREFIX/virt-hosts-enabled/${DOMAIN:-$NAME} || {
+	rm -f $PREFIX/virt-hosts-enabled/${DOMAIN:-$NAME} || {
 		printf "Failed to disable site: %s." ${DOMAIN:-$NAME}
 		exit 1	
 	}
@@ -643,8 +595,8 @@ fi
 if [ $DO_LIST -eq 1 ]
 then
 	cd $PREFIX
-	printf "%-40s Active?  Enabled?\n" "Site"
-	printf "%-40s =======  ========\n" "===="
+	printf "%-40s Enabled?\n" "Site"
+	printf "%-40s ========\n" "===="
 	find www/ -type f -name "myst.cfc" | \
 		grep -v "www/_" | \
 		xargs dirname | \
@@ -652,8 +604,7 @@ then
 		xargs -IFF sh -c \
 			'printf "%-40s %-8s %-8s\n" \
 				$(basename FF) \
-				$(test -h ./virt-hosts-available/`basename FF` && echo @Y || echo @N ) \
-				$(test -h ./virt-hosts-enabled/`basename FF` && echo @Y || echo @N ) \
+				$(test -h ./virt-hosts-enabled/`basename FF` && echo Y || echo N ) \
 			'
 	#	$(stat -c "%x" FF | awk "{ print $1 }") \
 	cd - >/dev/null
