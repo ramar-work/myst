@@ -338,6 +338,10 @@ systemd-stop:
 	systemctl stop lupache
 	systemctl stop myst 
 
+# update - Update a local install of Myst
+update:
+	make bin-install
+	make config-install
 
 # uninstall - Uninstall the myst package on a new system
 # TODO: Add a check for any sites in virt-hosts-{ available, enabled }
