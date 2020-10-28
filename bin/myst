@@ -8,7 +8,7 @@
 #
 # Author
 # ------
-#	Antonio R. Collins II (ramar@collinsdesign.net)
+# Antonio R. Collins II (ramar@collinsdesign.net)
 # Copyright 2016 - Present, Tubular Modular Inc dba Collins Design
 # Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 # 
@@ -400,6 +400,8 @@ EOF
 	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
 	cp $CP_FLAGS $SHAREDIR/error.cfm $DIR/std/
 	cp $CP_FLAGS $SHAREDIR/model.cfc $DIR/std/base/
+	cp $CP_FLAGS $SHAREDIR/components.base.cfc $DIR/components/base.cfc
+	cp $CP_FLAGS $SHAREDIR/routes.base.cfc $DIR/routes/base.cfc
 	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/
 	touch $DIR/_.cfm
 	[ $VERBOSE -eq 1 ] && echo DONE!
