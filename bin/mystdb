@@ -15,6 +15,13 @@
 # Usage
 # -----
 # ???
+# Datasources in Lucee's context file adhere to XML formats loosely matching the below:
+
+#<data-source allow="511" always-set-timeout="true" blob="false" class="com.mysql.cj.jdbc.Driver" clob="false" connectionTimeout="1" custom="useUnicode=true&amp;characterEncoding=UTF-8&amp;serverTimezone=America%2FNew_York&amp;useLegacyDatetimeCode=true" database="fifty9_db" dbdriver="MySQL" dsn="jdbc:mysql://{host}:{port}/{database}" host="localhost" id="mysql" metaCacheTimeout="60000" name="fifty9_db" param-delimiter="&amp;" param-leading-delimiter="?" param-separator="=" password="encrypted:7c4902954c642620e2f291002d7af419664aa46e5d0cfa90" port="3306" storage="false" username="local" validate="false"/>
+#
+#<data-source allow="511" blob="false" class="com.microsoft.sqlserver.jdbc.SQLServerDriver" clob="false" connectionTimeout="1" custom="DATABASENAME=sqlserver_test&amp;sendStringParametersAsUnicode=true&amp;SelectMethod=direct" database="sqlserver_test" dbdriver="MSSQL" dsn="jdbc:sqlserver://{host}:{port}" host="localhost" id="mssql" metaCacheTimeout="60000" name="sqlserver_test" param-delimiter=";" param-leading-delimiter=";" param-separator="=" password="encrypted:820015ab4f08a18b3dead86a771515d0b0fc415e2ae5acd091a4b32811d151e4" port="1433" storage="false" username="SA" validate="false"/>
+#
+#<data-source allow="511" blob="false" class="org.postgresql.Driver" clob="false" connectionTimeout="1" custom="" database="postgres_test" dbdriver="PostgreSql" dsn="jdbc:postgresql://{host}:{port}/{database}" host="localhost" metaCacheTimeout="60000" name="postgres_test" param-delimiter="&amp;" param-leading-delimiter="?" param-separator="=" password="encrypted:6e88d695ecee23f14a143976784522bc6c99b48c7e26e3e2" port="5432" storage="false" username="local" validate="false"/></data-sources>
 # 	
 # TODO
 # ----
@@ -40,7 +47,7 @@ DO_MSSQL=0
 DO_DRYRUN=0
 
 VERBOSE=0
-DO_GLOBAL=0
+DO_GLOBAL=1
 DO_CREATE=0
 DO_GENERATE=0
 
@@ -49,7 +56,7 @@ CONF_DBCONNLIMIT=100
 CONF_DBUSERNAME=
 CONF_DBPASSWORD=
 CONF_DBPORT=
-DATASOURCE_FILE=
+#DATASOURCE_FILE=
 TMPFILE=/tmp/app.cfc
 
 # An error function
@@ -65,9 +72,8 @@ usage() {
 	STATUS=${2:-0}
 	cat <<EOF
 $PROGRAM_NAME:
--c, --create            Create a datasource block. 
--g, --generate          Generate a datasource on the database server.
--f, --folder <arg>      Add the datasource to the app at <arg>
+-c, --create <arg>      Create a database with host tooling.
+-g, --generate <arg>    Generate a datasource on the database server.
 -n, --name <arg>        Datasource will have name <arg>
 -u, --user <arg>        Use this user name with the new data source.
     --password <arg>    Use this password with the new data source.
@@ -78,6 +84,11 @@ $PROGRAM_NAME:
 -s, --mssql             Assume the source is a Microsoft SQL server data source.
     --global            Create the datasource globally versus in one locked down context.
     --dry-run           Do a dry run, change no files.
+    --dump              Dump the configuration values that would result with a particular cli invocation
+
+Context Specific:
+-f, --folder <arg>      Add the datasource to the app at <arg>
+
 -v, --verbose           Be verbose.
 -h, --help              Show help.
 EOF
@@ -162,9 +173,17 @@ do
 	case "$1" in
 		-c|--create)	
 			DO_CREATE=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_NAME="$1"
 		;;
 		-g|--generate)	
 			DO_GENERATE=1	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_NAME="$1"
 		;;
 		-f|--folder)	
 			CODE=`detFlag "$2"`;
@@ -238,24 +257,45 @@ do
 done
 
 
-# Set all the verbose flags...
-CPFLAGS=
-if [ $VERBOSE -eq 1 ] 
-then
-	CPFLAGS="-v"
-fi
+# Dump options
+dumpopts() {
+	printf "%-25s%s\n" "DB NAME" $DB_NAME
+	printf "%-25s%s:%s\n" "USERNAME" $DB_USER ${DB_PWD:-"-"}
+	printf "%-25s%s\n" "ALLOW permissions" $ALLOW
+	printf "%-25s%s\n" "BLOB enabled?" $BLOB
+	printf "%-25s%s\n" "CLOB enabled?" $CLOB
+	printf "%-25s%s\n" "CONNECTION TIMEOUT" $CONNECTION_TIMEOUT
+	printf "%-25s%s\n" "CUSTOM" $CUSTOM
+	printf "%-25s%s\n" "DATABASE" $DATABASE
+	printf "%-25s%s\n" "DB DRIVER" $DB_DRIVER
+	printf "%-25s%s\n" "DSN" $DSN
+	printf "%-25s%s\n" "HOST" $HOST
+	printf "%-25s%s\n" "ID" $ID
+	printf "%-25s%s\n" "META CACHE TIMEOUT" $META_CACHE_TIMEOUT
+	printf "%-25s%s\n" "NAME" $NAME
+	printf "%-25s%s\n" "PORT" $PORT
+	printf "%-25s%s\n" "STORAGE" $STORAGE
+	printf "%-25s%s\n" "VALIDATE" $VALIDATE
+	printf "%-25s%s\n" "Extra options" $EXTRA_OPTIONS
+}
 
+# Dump a datasource in Lucee's XML format
+dumpxml() {
+	printf "<data-source allow=\"$ALLOW\" $EXTRA_OPTIONS blob=\"$BLOB\" class=\"$CLASS\" clob=\"$CLOB\" connectionTimeout=\"$CONNECTION_TIMEOUT\" custom=\"$CUSTOM\" database=\"$DATABASE\" dbdriver=\"$DBDRIVER\" dsn=\"$DSN\" host=\"$HOST\" id=\"$ID\" metaCacheTimeout=\"$META_CACHE_TIMEOUT\" name=\"$DB_NAME\" param-delimiter=\"&amp;\" param-leading-delimiter=\"?\" param-separator=\"=\" password=\"$PASSWORD\" port=\"$PORT\" storage=\"$STORAGE\" username=\"$DB_USER\" validate=\"$VALIDATE\"/>\n"
+}
+
+# Set all the verbose flags...
+[ $VERBOSE -eq 1 ] && CPFLAGS="-V" || CPFLAGS=
 
 # Include the file and check that prefix exists
 [ ! -d $PREFIX ] && err "$PROPNAME didn't install correctly (couldn't find source directory $PREFIX)\n" 1
 
-
 # Set a default port
-[ $DO_PGSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-0}; DBSUFFIX="pgsql"; }
-[ $DO_MYSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-3306}; DBSUFFIX="mysql"; }
-[ $DO_MSSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-1433}; DBSUFFIX="mssql"; }
+[ $DO_PGSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-5432}; DB_SUFFIX="pgsql"; DB_DRIVER="PostgreSql"; }
+[ $DO_MYSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-3306}; DB_SUFFIX="mysql";  DB_DRIVER="MySQL"; }
+[ $DO_MSSQL -eq 1 ] && { CONF_DBPORT=${CONN_DBPORT:-1433}; DB_SUFFIX="mssql"; DB_DRIVER="MSSQL"; }
 DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
-DATASOURCE_FILE=$PREFIX/share/myst/${DBSUFFIX}-db.cfc
+#DATASOURCE_FILE=$PREFIX/share/myst/${DB_SUFFIX}-db.cfc
 
 
 # Check that actions and types have been received...
@@ -283,30 +323,18 @@ then
 	[ -z "$DB_USER" ] && \
 		err "No database user specified.  (Try --user \$USERNAME)." 1
 
-
 	# who to do this as most likely.
-	if [ $DO_PGSQL -eq 1 ]
-	then
-		printf ''
-	fi
+	[ $DO_PGSQL -eq 1 ] && \
+		err "Postgres is not currently supported." 1 
 
+	[ $DO_MYSQL -eq 1 ] && {
+		mysql -u $DB_USER --password=$DB_PWD -e "CREATE DATABASE $DB_NAME"	
+	}
 
-	if [ $DO_MYSQL -eq 1 ]
-	then
-		# if there's a password, use it
-		mysql -u $DB_USER -e "CREATE DATABASE $DB_NAME"	
-	fi
-
-
-	if [ $DO_MSSQL -eq 1 ]
-	then
-		# -U user
-		# -P pass
-		# -S server 
-		# -Q execute and stop
-		sqlcmd -U $DB_USER -Q "CREATE DATABASE $DB_NAME"	
-	fi
-
+	[ $DO_MSSQL -eq 1 ] && {
+		# -U user, -P pass, -S server, -Q execute and stop
+		sqlcmd -U $DB_USER -P "$DB_PWD" -Q "CREATE DATABASE $DB_NAME"	
+	}	
 fi
 
 
@@ -324,7 +352,7 @@ then
 			err "Myst instance specified does not exist..." 1
 	fi
 
-	[ -z "$DATASOURCE_FILE" ] && \
+	[ -z "$DB_SUFFIX" ] && \
 		err "No database backend specified. (Use --mysql, --mssql, or --postgresql to specify one)." 1
 
 	[ -z "$DB_NAME" ] && \
@@ -337,158 +365,77 @@ then
 		#err "No database password specified for user.  (Try --password \$PASSWORD)." 1
 
 	# Check for Application.cfc	
-	[ ! -f "$FOLDER/Application.cfc" ] && \
-		err "No Application.cfc found at instance '$FOLDER'" 1
+	#[ ! -f "$FOLDER/Application.cfc" ] && \
+	#	err "No Application.cfc found at instance '$FOLDER'" 1
 
-	# Find the start of the component 
-	# TODO: note that this does not support non-script components
-	STARTLINE=`grep --line-number 'component {' $FOLDER/Application.cfc | \
-		awk -F ':' '{ print $1 }'`
-	[ -z "$STARTLINE" ] && \
-		err "Could not find component declaration at Application.cfc in '$FOLDER'" 1
+	# Default options
+	ALLOW=511
+	BLOB=false
+	CLOB=false
+	CONNECTION_TIMEOUT=1
+	CUSTOM=
+	DATABASE="$DB_NAME"
+	DBDRIVER="$DB_DRIVER"
+	DSN=
+	EXTRA_OPTIONS=
+	HOST="localhost"
+	ID=
+	META_CACHE_TIMEOUT=60000
+	NAME="$DB_NAME"
+	PARAM_DELIMITER="&amp;"
+	PARAM_LEADING_DELIMITER="?"
+	PARAM_SEPARATOR="="
+	PASSWORD="$DB_PWD"
+	PORT="$CONF_DBPORT"
+	STORAGE=false
+	USERNAME="$DB_USER"
+	VALIDATE=false
 
-	# Check for any data source strings, and try not to blow them away
-	DS_EXISTS=`grep 'BEGIN: mystdb' $FOLDER/Application.cfc >/dev/null && echo 1 || echo 0`
-	if [ $DS_EXISTS -eq 1 ]
-	then 
-		err "found mystdb datasource" 1
-		# make a copy
-		# delete the original one
-	fi
-
-	# Check for any data source strings, and try not to blow them away
-	DS_DECL=`grep 'this.datasources' $FOLDER/Application.cfc >/dev/null && echo 1 || echo 0`
-	DS_STARTSTRING=
-	DS_ENDSTRING=
-	#echo $DS_DECL
-	if [ $DS_DECL -eq 0 ]
-	then
-		DS_STARTSTRING="this.datasources = {"
-		DS_ENDSTRING="};"
-	fi
-
-	# Make a backup here...
-	[ $DO_DRYRUN -eq 0 ] && cp $CPFLAGS $FOLDER/Application.cfc $FOLDER/Application.cfc.bkp
-	# NOTE: (if only there were a way to test and made sure things worked...)
-
-	# Do a SELECT of USERS or DATABASES on each.  The user will have to specify
-	# who to do this as most likely.
-	if [ $DO_PGSQL -eq 1 ]
-	then
-		printf ''
-	fi
-
-	# set the write path of the new file
-	# TODO: Even with the shell, there is a way to write to memory...
-	# TMPFILE="$FOLDER/Application.cfc"	
-
-	# Assemble the file differently...
-	[ $DO_DRYRUN -eq 0 ] && sed -n "1,${STARTLINE}p" $FOLDER/Application.cfc > $TMPFILE
-
-	# Add the datasource string...
-	if [ $DO_PGSQL -eq 1 ]
-	then
-		printf ''>/dev/null
-	fi
-
-	# Add the datasource string...
 	if [ $DO_MYSQL -eq 1 ]
 	then
-		# a full mysql datasource looks like this:
-		# ---
-		# this.datasources["rcdb"] = {
-		# 	  class: 'com.mysql.jdbc.Driver'
-		# 	, bundleName: 'com.mysql.jdbc'
-		# 	, bundleVersion: '5.1.40'
-		# 	, connectionString: 'jdbc:mysql://localhost:3306/rcdb?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=round&tinyInt1isBit=false&autoReconnect=false&jdbcCompliantTruncation=false&allowMultiQueries=true&useLegacyDatetimeCode=true'
-		# 	, username: 'adam'
-		# 	, password: "encrypted:77007680f0a139ebc51fead12332d09b8e0a495236f2e3ff973489aebab6acf1"
-		# 	
-		# 	// optional settings
-		# 	, blob:true // default: false
-		# 	, clob:true // default: false
-		# 	, connectionLimit:100 // default:-1
-		# };
-
-		# Print out a block...
-		DB_REMOTEHOST=localhost
-		DB_PORT=3306		
-		{
-		cat <<EOF
-	$DS_STARTSTRING
-		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
-		"$DB_SYMNAME" = {
-				class: 'org.gjt.mm.mysql.Driver'
-			, connectionString: 'jdbc:mysql://$DB_REMOTEHOST:$DB_PORT/$DB_NAME?useUnicode=true&characterEncoding=UTF-8&useLegacyDatetimeCode=true&allowMultiQueries=true'
-			, username: '$DB_USER'
-			, password: '$DB_PWD'
-		}
-		//mystdb END
-	$DS_ENDSTRING	
-EOF
-		} >> $TMPFILE
-	fi
-
-
-	if [ $DO_MSSQL -eq 1 ]
+		CLASS="com.mysql.cj.jdbc.Driver"
+		CUSTOM="useUnicode=true&amp;characterEncoding=UTF-8&amp;serverTimezone=America%2FNew_York&amp;useLegacyDatetimeCode=true"
+		DSN="jdbc:mysql://{host}:{port}/{database}"
+		ID="mysql"
+		PORT=3306
+		EXTRA_OPTIONS='always-set-timeout="true"'
+	elif [ $DO_MSSQL -eq 1 ]
 	then
-		# A full MSSQL datasource will look something like this...
-		# ----
-		# this.datasources["cwnetdb"] = {
-		# 	  class: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
-		# 	, bundleName: 'mssqljdbc4'
-		# 	, bundleVersion: '4.0.2206.100'
-		# 	, connectionString: 'jdbc:sqlserver://localhost:1433;DATABASENAME=cw_netdb;sendStringParametersAsUnicode=true;SelectMethod=direct'
-		# 	, username: 'SA'
-		# 	, password: "encrypted:909d4f7eb7f2777dffd72775ce8f7ba7f89af5b477428d06fd114f599601b258"
-		# 	
-		# 	// optional settings
-		# 	, blob:yes // default: false
-		# 	, clob:yes // default: false
-		# 	, connectionLimit:100 // default:-1
-		# 	, storage:yes // default: false
-		# };
-		# Print out a block...
-		DB_REMOTEHOST=localhost
-		DB_PORT=1433
-		# This needs to be encrypted and salted... (and prefixed w/ the word 'encrypted:')
-		DB_PASS=$DB_PWD
-		DB_CONNLIMIT=-1
-
-		{
-		cat <<EOF
-	$DS_STARTSTRING
-		//mystdb BEGIN: mystdb added '$DB_SYMNAME' on `date +%F`
-		"$DB_SYMNAME" = {
-				class: 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
-			, bundleName: 'mssqljdbc4'
-			, bundleVersion: '4.0.2206.100'
-			, connectionString: 'jdbc:sqlserver://$DB_REMOTEHOST:$DB_PORT;DATABASENAME=$DB_NAME;sendStringParametersAsUnicode=true;SelectMethod=direct'
-			, username: '$DB_USER'
-			, password: '$DB_PWD'
-			, connectionLimit: $DB_CONNLIMIT 
-		}
-		//mystdb END
-	$DS_ENDSTRING
-EOF
-	} >> $TMPFILE 
+		CLASS="com.microsoft.sqlserver.jdbc.SQLServerDriver"
+		CUSTOM="DATABASENAME=sqlserver_test&amp;sendStringParametersAsUnicode=true&amp;SelectMethod=direct"
+		DSN="jdbc:sqlserver://{host}:{port}"
+		ID="mssql"
+		PORT=1433
+	elif [ $DO_PGSQL -eq 1 ]
+	then
+		CLASS="org.postgresql.Driver"
+		DSN="jdbc:postgresql://{host}:{port}/{database}"
+		ID="postgresql"
+		PORT=5432
 	fi
 
-	# Append the rest of the file to stdout
-	[ $DO_DRYRUN -eq 0 ] && sed -n "$(( $STARTLINE + 1 )),\$p" $FOLDER/Application.cfc  >> $TMPFILE
+	DB_CONFPATH=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
 
-	# Copy the file for real 
-	[ $DO_DRYRUN -eq 0 ] && cp $CPFLAGS $TMPFILE $FOLDER/Application.cfc	
+	# First check that the data source is not there
+	[ ! -z "$( cat $DB_CONFPATH | grep '<data-source ' | grep "name=\"$DB_NAME\"" )" ] && \
+		err "Datasource $DB_NAME is already present in Lucee config." 1
+	
+	# Then get the line number of the configuration
+	DB_SRCLINE=$( cat $DB_CONFPATH | grep --line-number '<data-source ' | awk -F ':' '{ print $1 }' )
+	[ -z "$DB_SRCLINE" ] && \
+		err "Could not locate database configuration in $DB_CONFPATH" 1
 
-	if [ 0 -eq 1 ]; then
-	# Replace everything
-	sed -i -e "{
-		s/__DBNAME__/$DB_NAME/;
-		s/__DBSYMNAME__/$DB_SYMNAME/;
-		s/__DBCONNLIMIT__/$CONF_DBCONNLIMIT/;
-		s/__DBUSERNAME__/$DB_USER/;
-		s/__DBPASSWORD__/$DB_PWD/;
-		s/__DBPORT__/$CONF_DBPORT/;
-	}" $DATASOURCE_FILE
-	fi
+	# finally, make a backup of the original 
+	DB_SRCCONF=$( cat $DB_CONFPATH | grep '<data-source ' )
+	cp $DB_CONFPATH `dirname $DB_CONFPATH`/lucee-server-bkp.xml
+
+	# And add the new line
+	DB_NEWSRC=$( echo "$DB_SRCCONF" | sed "s#</data-sources>##" )
+	sed -i "${DB_SRCLINE}d" $DB_CONFPATH
+	sed -i "${DB_SRCLINE}i $DB_NEWSRC`dumpxml`</data-sources>" $DB_CONFPATH
+
+	# How do I test this file?
+	# $DB_CONFPATH
+	
 fi
+exit 0
