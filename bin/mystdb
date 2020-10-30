@@ -90,7 +90,7 @@ $PROGRAM_NAME:
     --global            Create the datasource globally versus in one locked down context.
     --dry-run           Do a dry run, change no files.
     --dump              Dump the configuration values that would result with a particular cli invocation
--x, --run               Run SQL files (CAUTION: If you do not know what you are doing, you can easily do irreversible damage to your database!)
+-x, --run <arg>         Run SQL files (CAUTION: If you do not know what you are doing, you can easily do irreversible damage to your database!)
 
 Context Specific:
 -f, --folder <arg>      Add the datasource to the app at <arg>

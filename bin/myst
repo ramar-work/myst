@@ -179,9 +179,16 @@ do
 		-e|--enable)
 			DO_ENABLE=1
 			CODE=`detFlag "$2"`;
-			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
-			shift
-			NAME="$1"
+			if [ $CODE -lt 1 ] && [ $DO_CREATE -eq 1 ]
+			then
+				printf ''>/dev/null	
+			elif [ $CODE -lt 1 ]
+			then
+				err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1 
+			else 
+				shift
+				NAME="$1"
+			fi
 		;;
 
 		-x|--disable)

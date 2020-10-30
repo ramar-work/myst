@@ -1404,22 +1404,13 @@ abort;
 
 		//Now load each model, should probably put these in a scope
 		for ( var page in pgArray ) {
-			//Do all of that basic stuff... such as...
-	
-			//defining all vars
-			//get/set the namespace
 			var cexec;
 			var nsref; 
 			var path;
 
-			//first condition should check if we even continue
-
-			//subsequent conditions need to check for death...
-
 			//Model can be a struct too, this automatically puts things in things...
-			if ( page.type == "struct" /*catch other types?*/ ) {
+			if ( page.type == "struct" /*catch other types?*/ )
 				return failure( "Models as structs currently aren't supported." );
-			}
 			else if ( page.type == "closure" ) {
 				if ( !( cexec = evaluateClosure( page.value, result ) ).status )
 					return cexec;
@@ -1441,7 +1432,13 @@ abort;
 				}
 			}
 			else if ( page.type == "string" ) {
-				path = "#getRootDir()#app/#page.value#";
+				//If path contains @, then just replace it
+				if ( FindNoCase( "@", page.value ) == 0 )
+					path = "#getRootDir()#app/#page.value#";
+				else {
+					page.value = Replace( page.value, "@", routedata.file ); 
+					path = "#getRootDir()#app/#page.value#";
+				}
 
 				//Use either namespace or basename to identify the model when more than one is in use...
 				if ( StructKeyExists( namespace, page.value ) )
@@ -1452,7 +1449,7 @@ abort;
 					nsref = pv[ Len( pv ) ];	
 				}
 
-				if ( !FileExists("#path#.cfc") && !FileExists("#path#.cfm") )
+				if ( !FileExists( "#path#.cfc" ) && !FileExists( "#path#.cfm" ) )
 					return failure( "Could not locate requested model file '#page.value#.cf[cm]' for key 'default'" );
 				else if ( FileExists( "#path#.cfc" ) ) {
 					//Try to evaluate the model file, if it fails, let the user know why 
@@ -1465,7 +1462,7 @@ abort;
 						//result[ nsref ] = cexec.results;
 						//TODO: Should a status of false just kill everything?
 						//if the type is anything besides a struct, it needs a name 
-						if ( gettype(cexec.results).type != "struct" )
+						if ( gettype( cexec.results ).type != "struct" )
 							StructInsert( result, nsref, cexec.results );
 						else {
 							for ( var k in cexec.results ) {
@@ -1531,9 +1528,10 @@ abort;
 				//Set pageArray if it's string or array
 				var pageArray = (ev.type == 'string') ? [ ev.value ] : ev.value;
 				var cs;
-
+			
 				//Now load each model, should probably put these in a scope
 				for ( var x in pageArray ) {
+					x = FindNoCase( "@", x ) ? Replace( x, "@", rd.file ) : x;
 					if ( !( cs = _include( where="views", name=x ) ).status ) {
 						return cs;
 					}
@@ -2287,7 +2285,6 @@ abort;
 
 		//Load all of the components here /*!appdata.bypassComponents && */
 		if ( !( ctx.components = loadComponents( this )).status ) {
-writedump( ctx.components ); abort;
 			return this.respondWith( 500, ctx.components );
 		}
 		else {

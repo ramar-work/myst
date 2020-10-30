@@ -72,7 +72,7 @@ Install options:
 -i, --install <arg>     Choose a module to install.
 -e, --extract <arg>     Extract a potential module's files from a live instance.
     --from <arg>        Choose folder or file where the project may be. (BETA)
-    --to <arg>          Install the extension to <arg> 
+    --at <arg>          Install the extension to <arg> 
 
 Metadata options:
 -a, --author <arg>       Specify an author for the new module.
@@ -248,7 +248,7 @@ do
 #MODPATH="$1"
 		;;
 
-		--to)
+		--at)
 			# Another parameter in data.json
 			shift
 			TOPATH="$1"
@@ -318,29 +318,28 @@ then
 	FOLDER=$TOPATH
 	test ! -z "$FROMPATH" && MODPATH=$FROMPATH
 	#echo $FOLDER $MODPATH
-fi
-
-
-if [ $DO_EXTRACT -eq 1 ] 
+elif [ $DO_EXTRACT -eq 1 ] 
 then
 	FOLDER=$FROMPATH
 	MODPATH=$TOPATH	
 	#echo $FOLDER $MODPATH
+else
+	FOLDER=$TOPATH
 fi
 
 
 # if FOLDER is needed, it ought to be a full path
 if [ ! -z "$FOLDER" ] 
 then
-	FOLDER=`realpath $FOLDER`
-	echo $FOLDER
+	FOLDER=$HTTPD_SRVDIR/$FOLDER
+	#echo $FOLDER
 fi
 
 
 # Check the datasource here
 if [ ! -z "$DATASOURCE" ]
 then
-	mystdb --check "$DATASOURCE" || err "Datasource not valid."
+	mystdb --check "$DATASOURCE" || exit 1
 fi
 
 # List the repos
@@ -515,11 +514,18 @@ fi
 # Complete any setup of any kind
 if [ $DO_SETUP -eq 1 ]
 then
-	[ -z "$MODITEM" ] && err "Can't setup unnamed package (use --module)" 1
-	[ -z "$ADDR" ] && err "Can't setup the package with no web address. (Specify where the instance lives with --addr \$WWW)"
-	[ $VERBOSE -eq 1 ] && echo "wget $ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM"
-	# Let's see the header and response text on the command line, cut any leading spaces or tabs
-	wget --quiet -O- "$ADDR/api/setup.cfm?file=setup.sql&module=$MODITEM" | sed 's/^[\t, ]//g'
+	# File for setup
+	SETUP_FILE=$FOLDER/setup/$MODNAME/setup.sql
+
+	# Check for setup.sql in the module's path
+	stat $SETUP_FILE >/dev/null || err "no setup file exists for $MODNAME" 1
+	
+	# Check that a datasource was specified and that it exists
+	[ ! -z "$DATASOURCE" ] || err 'no datasource specified.' 1
+	mystdb --check "$DATASOURCE" || exit 1
+
+	# Finally, run the sql file (check for failure, etc)
+	mystdb --run $SETUP_FILE --name "$DATASOURCE"
 fi
 
 
