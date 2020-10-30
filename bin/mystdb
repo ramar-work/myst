@@ -41,6 +41,7 @@ DB_PORT=
 FOLDER=
 
 REMOTE_HOST=
+DO_CHECK=0
 DO_PGSQL=0
 DO_MYSQL=0
 DO_MSSQL=0
@@ -89,9 +90,7 @@ $PROGRAM_NAME:
     --global            Create the datasource globally versus in one locked down context.
     --dry-run           Do a dry run, change no files.
     --dump              Dump the configuration values that would result with a particular cli invocation
--x, --run               Run SQL files 
-												(CAUTION: If you do not know what you are doing, you can easily 
-												do irreversible damage to your database!)
+-x, --run               Run SQL files (CAUTION: If you do not know what you are doing, you can easily do irreversible damage to your database!)
 
 Context Specific:
 -f, --folder <arg>      Add the datasource to the app at <arg>
@@ -309,6 +308,37 @@ dumpxml() {
 	printf "<data-source allow=\"$ALLOW\" $EXTRA_OPTIONS blob=\"$BLOB\" class=\"$CLASS\" clob=\"$CLOB\" connectionTimeout=\"$CONNECTION_TIMEOUT\" custom=\"$CUSTOM\" database=\"$DATABASE\" dbdriver=\"$DBDRIVER\" dsn=\"$DSN\" host=\"$HOST\" id=\"$ID\" metaCacheTimeout=\"$META_CACHE_TIMEOUT\" name=\"$DB_NAME\" param-delimiter=\"&amp;\" param-leading-delimiter=\"?\" param-separator=\"=\" password=\"$PASSWORD\" port=\"$PORT\" storage=\"$STORAGE\" username=\"$DB_USER\" validate=\"$VALIDATE\"/>\n"
 }
 
+# Check for validity of datasource
+is_ds_valid() {
+	# All will have at least a username and password, and will be present
+	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	if [ "$( xmllint $CONFIG --xpath "//data-source[@name='$1']" 2>&1 )" == "XPath set is empty" ]
+	then
+		return 1
+	fi
+}
+
+
+# Populate a "structure" of datasource values
+get_ds_values() {
+	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	# Username and password should be allowed to be overridden
+	DS_UNAME_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(username="[a-z,0-9,:]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+
+	DS_PASSW_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(password="[a-z,0-9,:]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+
+	DB_DRIVER=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(dbdriver="[a-z,A-Z,0-9]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+}
+
 # Set all the verbose flags...
 [ $VERBOSE -eq 1 ] && CPFLAGS="-V" || CPFLAGS=
 
@@ -322,6 +352,11 @@ dumpxml() {
 DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
 #DATASOURCE_FILE=$PREFIX/share/myst/${DB_SUFFIX}-db.cfc
 
+# Run checks early
+[ $DO_CHECK -eq 1 ] && {
+	is_ds_valid $DB_NAME || err "Datasource '$DB_NAME' not valid." 1
+	exit 0
+}
 
 # Check that actions and types have been received...
 if [ 1 -eq 1 ]
@@ -474,36 +509,6 @@ then
 fi
 
 
-# Check for validity of datasource
-is_ds_valid() {
-	# All will have at least a username and password, and will be present
-	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
-	if [ "$( xmllint $CONFIG --xpath "//data-source[@name='$1']" 2>&1 )" == "XPath set is empty" ]
-	then
-		return 1
-	fi
-}
-
-
-# Populate a "structure" of datasource values
-get_ds_values() {
-	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
-	# Username and password should be allowed to be overridden
-	DS_UNAME_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
-		sed 's/.*\(username="[a-z,0-9,:]*"\) .*/\1/' | \
-		awk -F '=' '{ print $2 }' | \
-		sed 's/"//g' )
-
-	DS_PASSW_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
-		sed 's/.*\(password="[a-z,0-9,:]*"\) .*/\1/' | \
-		awk -F '=' '{ print $2 }' | \
-		sed 's/"//g' )
-
-	DB_DRIVER=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
-		sed 's/.*\(dbdriver="[a-z,A-Z,0-9]*"\) .*/\1/' | \
-		awk -F '=' '{ print $2 }' | \
-		sed 's/"//g' )
-}
 
 if [ $DO_LIST -eq 1 ]
 then
