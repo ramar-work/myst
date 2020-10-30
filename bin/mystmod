@@ -337,6 +337,12 @@ then
 fi
 
 
+# Check the datasource here
+if [ ! -z "$DATASOURCE" ]
+then
+	mystdb --check "$DATASOURCE" || err "Datasource not valid."
+fi
+
 # List the repos
 if [ $DO_LIST -eq 1 ] 
 then

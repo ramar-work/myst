@@ -50,6 +50,8 @@ VERBOSE=0
 DO_GLOBAL=1
 DO_CREATE=0
 DO_GENERATE=0
+DO_LIST=0
+DO_RUN=0
 
 
 CONF_DBCONNLIMIT=100
@@ -77,7 +79,9 @@ $PROGRAM_NAME:
 -n, --name <arg>        Datasource will have name <arg>
 -u, --user <arg>        Use this user name with the new data source.
     --password <arg>    Use this password with the new data source.
--c, --max-conn <arg>    How many connections should the new data source be able to take?
+-l, --list              List all datasources
+-k, --check <arg>       Check that a particular datasource exists
+    --max-conn <arg>    How many connections should the new data source be able to take?
     --remote <arg>      The location of a remote server that this should attach to.
 -p, --postgres          Assume the source is a PostgreSQL data source.
 -m, --mysql             Assume the source is a MySQL data source.
@@ -85,6 +89,9 @@ $PROGRAM_NAME:
     --global            Create the datasource globally versus in one locked down context.
     --dry-run           Do a dry run, change no files.
     --dump              Dump the configuration values that would result with a particular cli invocation
+-x, --run               Run SQL files 
+												(CAUTION: If you do not know what you are doing, you can easily 
+												do irreversible damage to your database!)
 
 Context Specific:
 -f, --folder <arg>      Add the datasource to the app at <arg>
@@ -185,6 +192,13 @@ do
 			shift
 			DB_NAME="$1"
 		;;
+		-k|--check)	
+			DO_CHECK=1
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_NAME="$1"
+		;;
 		-f|--folder)	
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
@@ -198,7 +212,7 @@ do
 			DB_NAME="$1"
 		;;
 
-		-x|--max-conn)	
+		--max-conn)	
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
 			shift
@@ -211,6 +225,7 @@ do
 			shift
 			DB_USER="$1"
 		;;
+
 		--password)	
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
@@ -227,8 +242,18 @@ do
 			err "--global argument is not yet supported." 1
 			DO_GLOBAL=1	
 		;;
+		-x|--run)	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			FILE="$1"
+			DO_RUN=1
+		;;
 		--dry-run)	
 			DO_DRYRUN=1
+		;;
+		-l|--list)	
+			DO_LIST=1
 		;;
 		-p|--postgres)	
 			DO_PGSQL=1
@@ -301,8 +326,17 @@ DB_SYMNAME=${DB_SYMNAME:-$DB_NAME}
 # Check that actions and types have been received...
 if [ 1 -eq 1 ]
 then
-	[ $DO_MYSQL -eq 0 ] && [ $DO_PGSQL -eq 0 ] && [ $DO_MSSQL -eq 0 ] && err "No database backend chosen." 1
-	[ $DO_GENERATE -eq 0 ] && [ $DO_CREATE -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
+	if [ $DO_GENERATE -eq 1 ] || [ $DO_CREATE -eq 1 ]
+	then
+		[ $DO_MYSQL -eq 0 ] && \
+		[ $DO_PGSQL -eq 0 ] && \
+		[ $DO_MSSQL -eq 0 ] && err "No database backend chosen." 1
+	fi	
+
+	[ $DO_GENERATE -eq 0 ] && \
+	[ $DO_CREATE -eq 0 ] && \
+	[ $DO_LIST -eq 0 ] && \
+	[ $DO_RUN -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
 fi
 
 
@@ -437,5 +471,81 @@ then
 	# How do I test this file?
 	# $DB_CONFPATH
 	
+fi
+
+
+# Check for validity of datasource
+is_ds_valid() {
+	# All will have at least a username and password, and will be present
+	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	if [ "$( xmllint $CONFIG --xpath "//data-source[@name='$1']" 2>&1 )" == "XPath set is empty" ]
+	then
+		return 1
+	fi
+}
+
+
+# Populate a "structure" of datasource values
+get_ds_values() {
+	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	# Username and password should be allowed to be overridden
+	DS_UNAME_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(username="[a-z,0-9,:]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+
+	DS_PASSW_FROM_FILE=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(password="[a-z,0-9,:]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+
+	DB_DRIVER=$( xmllint $CONFIG --xpath "//data-source[@name='$1']" | \
+		sed 's/.*\(dbdriver="[a-z,A-Z,0-9]*"\) .*/\1/' | \
+		awk -F '=' '{ print $2 }' | \
+		sed 's/"//g' )
+}
+
+if [ $DO_LIST -eq 1 ]
+then
+	echo "Available datasources: "
+	CONFIG=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	xmllint $CONFIG --xpath "//data-sources" | \
+		sed 's/></\n/g' | \
+		sed 's/.* \(name="[^"]*"\) .*/\1/g; s/name=//g; s/"//g;' | \
+		grep -v 'data-sources'
+	exit 0
+fi
+
+
+if [ $DO_RUN -eq 1 ]
+then
+	# First find the datasource and make sure it's valid
+	is_ds_valid "$DB_NAME" || err "Datasource '$DB_NAME' not valid." 1 
+
+	# Second parse all the information out into something useful 
+	get_ds_values "$DB_NAME"
+	# (at mininum I need dbdriver, username and password, port is probably good too
+	#echo $DS_UNAME_FROM_FILE
+	#echo $DS_PASSW_FROM_FILE
+	#echo $DB_DRIVER
+	#echo $DB_NAME
+
+	# Third, check that the file specified exists
+	stat -f "$FILE" >/dev/null || err "Could not access '$FILE'" 1 
+
+	# Finally, load a file in an instance?
+	if [ $DB_DRIVER == "PostgreSql" ]
+	then
+		err 'Postgres not supported yet, please be patient' 1	
+	elif [ $DB_DRIVER == "MySQL" ]
+	then
+		mysql -u $DS_UNAME_FROM_FILE --password=$DS_PASSW_FROM_FILE -D $DB_NAME < $FILE
+	elif [ $DB_DRIVER == "MSSQL" ]
+	then
+		printf '' #sqlcmd -U "$DS_UNAME_FROM_FILE" -P "$DS_PASSW_FROM_FILE" -D $DB_NAME < $FILE
+		#sqlcmd -U $DB_USER -P "$DB_PWD"  
+	else 
+		err "unsupported driver specified for datasource $DB_NAME" 1
+	fi
 fi
 exit 0
