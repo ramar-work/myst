@@ -305,7 +305,7 @@ dumpopts() {
 
 # Dump a datasource in Lucee's XML format
 dumpxml() {
-	printf "<data-source allow=\"$ALLOW\" $EXTRA_OPTIONS blob=\"$BLOB\" class=\"$CLASS\" clob=\"$CLOB\" connectionTimeout=\"$CONNECTION_TIMEOUT\" custom=\"$CUSTOM\" database=\"$DATABASE\" dbdriver=\"$DBDRIVER\" dsn=\"$DSN\" host=\"$HOST\" id=\"$ID\" metaCacheTimeout=\"$META_CACHE_TIMEOUT\" name=\"$DB_NAME\" param-delimiter=\"&amp;\" param-leading-delimiter=\"?\" param-separator=\"=\" password=\"$PASSWORD\" port=\"$PORT\" storage=\"$STORAGE\" username=\"$DB_USER\" validate=\"$VALIDATE\"/>\n"
+	echo "<data-source allow=\"$ALLOW\" $EXTRA_OPTIONS blob=\"$BLOB\" class=\"$CLASS\" clob=\"$CLOB\" connectionTimeout=\"$CONNECTION_TIMEOUT\" custom=\"$CUSTOM\" database=\"$DATABASE\" dbdriver=\"$DBDRIVER\" dsn=\"$DSN\" host=\"$HOST\" id=\"$ID\" metaCacheTimeout=\"$META_CACHE_TIMEOUT\" name=\"$DB_NAME\" param-delimiter=\"&amp;\" param-leading-delimiter=\"?\" param-separator=\"=\" password=\"$PASSWORD\" port=\"$PORT\" storage=\"$STORAGE\" username=\"$DB_USER\" validate=\"$VALIDATE\"/>"
 }
 
 # Check for validity of datasource
@@ -485,23 +485,30 @@ then
 
 	DB_CONFPATH=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
 
-	# First check that the data source is not there
-	[ ! -z "$( cat $DB_CONFPATH | grep '<data-source ' | grep "name=\"$DB_NAME\"" )" ] && \
-		err "Datasource $DB_NAME is already present in Lucee config." 1
-	
-	# Then get the line number of the configuration
-	DB_SRCLINE=$( cat $DB_CONFPATH | grep --line-number '<data-source ' | awk -F ':' '{ print $1 }' )
-	[ -z "$DB_SRCLINE" ] && \
-		err "Could not locate database configuration in $DB_CONFPATH" 1
+	if [ $DO_DRYRUN -gt 0 ]
+	then
+		dumpxml
+	else
 
-	# finally, make a backup of the original 
-	DB_SRCCONF=$( cat $DB_CONFPATH | grep '<data-source ' )
-	cp $DB_CONFPATH `dirname $DB_CONFPATH`/lucee-server-bkp.xml
+		# First check that the data source is not there
+		[ ! -z "$( cat $DB_CONFPATH | grep '<data-source ' | grep "name=\"$DB_NAME\"" )" ] && \
+			err "Datasource $DB_NAME is already present in Lucee config." 1
+		
+		# Then get the line number of the configuration
+		DB_SRCLINE=$( cat $DB_CONFPATH | grep --line-number '<data-source ' | awk -F ':' '{ print $1 }' )
+		[ -z "$DB_SRCLINE" ] && \
+			err "Could not locate database configuration in $DB_CONFPATH" 1
 
-	# And add the new line
-	DB_NEWSRC=$( echo "$DB_SRCCONF" | sed "s#</data-sources>##" )
-	sed -i "${DB_SRCLINE}d" $DB_CONFPATH
-	sed -i "${DB_SRCLINE}i $DB_NEWSRC`dumpxml`</data-sources>" $DB_CONFPATH
+		# finally, make a backup of the original 
+		DB_SRCCONF=$( cat $DB_CONFPATH | grep '<data-source ' )
+		cp $DB_CONFPATH `dirname $DB_CONFPATH`/lucee-server-bkp.xml
+
+		# And add the new line
+		DB_NEWSRC=$( echo "$DB_SRCCONF" | sed "s#</data-sources>##" )
+		sed -i "${DB_SRCLINE}d" $DB_CONFPATH
+		sed -i "${DB_SRCLINE}i $DB_NEWSRC`dumpxml`</data-sources>" $DB_CONFPATH
+
+	fi
 
 	# How do I test this file?
 	# $DB_CONFPATH
