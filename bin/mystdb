@@ -42,6 +42,7 @@ FOLDER=
 
 REMOTE_HOST=
 DO_CHECK=0
+DO_REMOVE=0
 DO_PGSQL=0
 DO_MYSQL=0
 DO_MSSQL=0
@@ -76,7 +77,8 @@ usage() {
 	cat <<EOF
 $PROGRAM_NAME:
 -c, --create <arg>      Create a database with host tooling.
--g, --generate <arg>    Generate a datasource on the database server.
+-g, --generate <arg>    Generate a datasource within Lucee.
+-r, --remove <arg>      Remove a datasource within Lucee.
 -n, --name <arg>        Datasource will have name <arg>
 -u, --user <arg>        Use this user name with the new data source.
     --password <arg>    Use this password with the new data source.
@@ -186,6 +188,13 @@ do
 		;;
 		-g|--generate)	
 			DO_GENERATE=1	
+			CODE=`detFlag "$2"`;
+			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
+			shift
+			DB_NAME="$1"
+		;;
+		-r|--remove)	
+			DO_REMOVE=1	
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
 			shift
@@ -370,6 +379,7 @@ then
 
 	[ $DO_GENERATE -eq 0 ] && \
 	[ $DO_CREATE -eq 0 ] && \
+	[ $DO_REMOVE -eq 0 ] && \
 	[ $DO_LIST -eq 0 ] && \
 	[ $DO_RUN -eq 0 ] && err "No actions chosen (try --generate or --create)." 1
 fi
@@ -515,6 +525,20 @@ then
 	
 fi
 
+
+if [ $DO_REMOVE -eq 1 ]
+then
+	DB_CONFPATH=$PREFIX/tomcat/lucee-server/context/lucee-server.xml
+	printf '' > /dev/null
+
+	# First check that the data source is not there
+	#[ ! -z "$( cat $DB_CONFPATH | grep '<data-source ' | grep "name=\"$DB_NAME\"" )" ] && \
+	#	err "Datasource $DB_NAME is already present in Lucee config." 1
+	
+	# You'd have to find the position of the name= field and count back	
+	cat $DB_CONFPATH | grep '<data-source ' | grep "name=\"$DB_NAME\"" 
+	
+fi
 
 
 if [ $DO_LIST -eq 1 ]
