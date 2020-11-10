@@ -14,22 +14,11 @@
  * ---------------------------------------------- */
 component
 name="model"
-accessors=true {
+accessors="true" {
 
 	property type="list" name="dependencies" default="";
 
 	property type="string" name="dependencyBaseDir" default="";
-
-	/** 
-	 * Maps dependencies specified in a model's 'dependencies' property.
-	 *
-	 */
-	private boolean function mapDependencies() {
-		for ( var n in ListToArray( getDependencies() ) ) {
-			variables[ basename( n ) ] = createObject( n ).init( myst );
-		}
-		return true;
-	}
 
 	/** 
 	 * Return an appropriate scope per received method.
@@ -72,23 +61,6 @@ accessors=true {
 		return basename( getMetadata( this ).name );
 	}
 
-	/** 
-	 * Check if a route maps to a method name (and invoke it automatically)
-	 *
-	 */
-	private struct function doesRouteMap( numeric step=1 ) {
-		var f = getMetadata( this ).functions;
-		//Only move back $step times in the routing table
-		for ( var s = 0; s < step; s++ ) {
-			var name = route.parts[ Len(route.parts) - s ]; 
-			for ( var fd in f ) {
-				if ( fd.name == name ) {
-					return { status = true, name = name };
-				}
-			}
-		}
-		return { status = false };
-	}
 
 	function init( myst ) {
 		variables.myst = myst;
@@ -104,8 +76,8 @@ accessors=true {
 		}
 
 		//Add any dependencies
-		if ( !mapDependencies() ) {
-
+		for ( var n in ListToArray( getDependencies() ) ) {
+			variables[ basename( n ) ] = createObject( n ).init( myst );
 		}
 		return this;	
 	}
