@@ -21,15 +21,17 @@ component extends="std.base.model" {
 
 	//This assumes that the path exists somehow...
 	//It also assumes that your server is fast... b/c this is inefficient
-	private array function returnPath( required string bp, required file ) {
+	private array function returnPath( required string t, required file ) {
 		//Return an array if that's what's given...
 		var arr = [];
 		for ( var nn in arguments[2] ) {
 			var file = arguments[2][nn];
-			if ( FileExists( "#createName()#/#bp#/custom/#file#" ) )
-				ArrayAppend( arr, "#createName()#/#bp#/custom/#file#" );
+			var ext = ( t == "app" ) ? "cfc" : "cfm";
+			var customPath = "#myst.getRootdir()##t#/#createName()#/custom/#file#.#ext#"; 
+			if ( FileExists( customPath ) )
+				ArrayAppend( arr, "#createName()#/custom/#file#" );
 			else {
-				ArrayAppend( arr, "#createName()#/#bp#/#file#" ); 
+				ArrayAppend( arr, "#createName()#/#file#" ); 
 			}
 		}
 		return arr;
@@ -37,11 +39,11 @@ component extends="std.base.model" {
 
 	//...
 	function init(myst, model) {
-		variables.path.public = function (required file) {
-			return returnPath( "no-auth", arguments );
+		variables.view.path = function (required file) {
+			return returnPath( "views", arguments );
 		}
-		variables.path.private = function (required file) {
-			return returnPath( "auth", arguments );
+		variables.app.path = function (required file) {
+			return returnPath( "app", arguments );
 		}
 		return Super.init( myst );
 	}

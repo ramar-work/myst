@@ -75,27 +75,18 @@ accessors="true"
 	//A dynamic property could be added within this method...
 	public void function inject () {}
 
-	public function init ( required mystObject, string realname, string namespace, string dbPrefix, Boolean debuggable, Boolean showInitialization ) {
+	//public function init ( required mystObject, string realname, string namespace, string dbPrefix, Boolean debuggable, Boolean showInitialization ) {
+	public function init ( required myst ) {
 		//Always tell me what module this is
 		var c = getMetadata( this );
 
 		//Set a reference to Myst before starting
-		setMyst( mystObject );
-		variables.myst = mystObject;
-
-		//Set all of the things...
-		if ( StructKeyExists( arguments, "realname" ) )
-			variables.realname = arguments.realname ;	
-		if ( StructKeyExists( arguments, "namespace" ) )
-			variables.namespace = arguments.namespace ;	
-		if ( StructKeyExists( arguments, "dbPrefix" ) )
-			variables.DBPrefix = arguments.dbPrefix ;	
-		if ( StructKeyExists( arguments, "debuggable" ) )
-			variables.debug = arguments.debuggable ;	
+		variables.myst = myst;
 
 		//Set the datasource
 		variables.datasource = myst.getAppdata().source;
+
+		//Return the object
 		return this;
 	}
-
 } 
