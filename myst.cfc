@@ -1613,14 +1613,20 @@ abort;
 				if ( q.name neq "Application.cfc" && q.name neq "base.cfc" ) {
 					var vv = Replace( q.name, ".cfc", "" );
 					//var cname = Replace( q.name, ".cfc", "" );
-					componentStruct[ cname ] = createObject( "component", "components.#cname#" ).init(
-						mystObject = this 
+					if ( FileExists( "#getRootdir()#components/overrides/#q.name#" ) )
+						componentStruct[ cname ] = createObject( "component", "components.overrides.#cname#" ).init( myst = this );
+					else {
+						componentStruct[ cname ] = createObject( "component", "components.#cname#" ).init( myst = this );
+					}	
+					//componentStruct[ cname ] = createObject( "component", "components.#cname#" ).init( myst = this );
+					/*
 					, realname = cname
 					, namespace = cname
 					, datasource = datasource
 					, debuggable = 0
 					, verbose = 0
 					);
+					*/
 				}
 				logReport("Successfully loaded component #q.name#!");
 			}
@@ -2744,78 +2750,53 @@ abort;
 	//Make HTTP requests in a saner fashion
 	public struct function httpRequest( required string apiUrl, required string method, struct payload, struct headers ) {
 		//Define some headers
-		var method;
 		var fakeUa = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36";
 		var apiHeaders = {};
 
 		try {
-			//Set some basic headers
-			apiHeaders[ "accept" ] = "*/*";
-			apiHeaders[ "Content-Type" ] = "application/x-www-form-urlencoded";
-			//apiHeaders[ "User-Agent" ] = fakeUa;
-
-			//Check for an access token
-			/*
-			if ( StructKeyExists( session, "access_token" ) ) {
-				headers[ "Authorization" ] = "Bearer #session.access_token#";
-			}
-			*/
-
-			//Negotiate method
-			if ( LCase(arguments.method) eq "post" ) 
-				method="post";
-			else if ( LCase(arguments.method) eq "put" ) 
-				method="put";
-			else if ( LCase(arguments.method) eq "head" )
-				method="head";
-			else {
-				method="get";
-			}
-
-			//Send off a request (remember that it blocks, and also that it ...???)
+			//Create a new request object
 			var http = new http( method=UCase(method), charset="utf-8", url=arguments.apiUrl );
 			http.setUserAgent( fakeUa );
 
-			/*
+			//Add appropriate headers
+			if ( StructKeyExists( headers, "Content-Type" ) ) 
+				http.addParam( type="header", name="Content-Type", value=headers["Content-Type"] );
+			else if ( method eq "POST" || method eq "PUT" )
+				http.addParam( type="header", name="Content-Type", value="application/x-www-form-urlencoded" );
+			else if ( arguments.method eq "multipart" ) {
+				http.addParam( type="header", name="Content-Type", value="multipart/form-data" );
+			}
+
 			//Add the headers
 			if ( StructKeyExists( arguments, "headers" ) ) {
 				for ( var k in arguments.headers ) {
-					http.addParam(type="header",name=k,value=headers[k]);
+					http.addParam( type="header", name=k, value=headers[k] );
 				}
 			}
-			*/
 
 			//Add the body fields
 			if ( StructKeyExists( arguments, "payload" ) ) {
 				//check between get and post (or pull them)
-				for ( var k in arguments.payload ) {
+				for ( var k in payload ) {
 					//TODO: if payload is a one-level deep struct, then don't worry about looping
 					//if it's deeper, then loop through each and continue adding the fields, but you have to 
 					//make sure that one is part of the body and the other is part of the url
-					http.addParam( type="formfield", name=k, value=payload[k] );
+					http.addParam( type="formfield", name=LCase( k ), value=payload[k] );
 				}
 			}
 
-			//What goes wrong here?!
-			//writedump( http ); abort;
-			var h = http.send( );
+			var h = http.send();
 			var p = h.getPrefix();
-			//writedump( p ); writedump( p.fileContent ); abort;
 		}
 		catch (any e) {
-			return {
-				status = false 
-			, message = "FAILURE" 
-			, data = ""
-			, extra = "" 
-			};
+			return failure( "Failure to perform HTTP '#method#' on URL '#apiURL#'", e );
 		}
 
 		//When this returns, I want to see the content in my window
 		return {
 			status = true
-		, message = "SUCCESS" 
-		, data = p.fileContent 
+		, message = "Successfully performed HTTP #method# on URL '#apiURL#'" 
+		, results = p.fileContent 
 		, extra = p
 		};
 	}
