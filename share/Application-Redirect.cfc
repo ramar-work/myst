@@ -1,4 +1,3 @@
-<!---
 /* ---------------------------------------------- *
  * Application-Redirect.cfc
  * ========================
@@ -17,7 +16,6 @@
  * A stub used to redirect requests to disallowed directories.
  *
  * ---------------------------------------------- */
- --->
 component {
 	function onRequest (string targetPage)  {
 		include "../data.cfm";

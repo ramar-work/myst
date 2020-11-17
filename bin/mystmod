@@ -505,7 +505,7 @@ then
 		[ $VERBOSE -eq 1 ] && TARFLAGS="--verbose" || TARFLAGS=	
 		#git archive --format tar HEAD | tar xf - $TARFLAGS --exclude=.gitignore -C $FOLDER/
 		#echo untarring $MODPATH/$MODNAME to $FOLDER/
-		tar --exclude=.git -cf - . | tar xf - --verbose -C $FOLDER/
+		tar --exclude=.git -cf - . | tar xf - $TARFLAGS -C $FOLDER/
 		cd -
 	fi
 fi

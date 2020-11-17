@@ -1,4 +1,3 @@
-<!---
 /* ---------------------------------------------- *
 Application.example.cfc
 =======================
@@ -17,7 +16,6 @@ Summary
 An Application.cfc example.
 
  * ---------------------------------------------- */
- --->
 component
 {
 	//A datasource map

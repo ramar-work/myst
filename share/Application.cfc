@@ -1,23 +1,18 @@
-<!---
 /* ---------------------------------------------- *
 Application.cfc
 ===============
 
-Author
-------
+@author
 Antonio R. Collins II (ramar@collinsdesign.net)
 
-Copyright
----------
+@copyright
 Copyright 2016-Present, "Tubular Modular"
 Original Author Date: Tue Jul 26 07:26:29 2016 -0400
 
-Summary
--------
+@summary
 All Application.cfc rules are specified here.
 
  * ---------------------------------------------- */
- --->
 component {
 
 	property name="applicationname";

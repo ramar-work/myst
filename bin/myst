@@ -403,10 +403,11 @@ EOF
 	# Populate the new instance
 	[ $VERBOSE -eq 1 ] && printf "\n* Populating new $PNAME instance...\n"
 	cp $CP_FLAGS $SHAREDIR/{Application.cfc,$SYMNAME.cfc,index.cfm,data.cfm} $DIR/
-	cp $CP_FLAGS $SHAREDIR/app-default.cfc $DIR/app/default.cfc
-	cp $CP_FLAGS $SHAREDIR/views-default.cfm $DIR/views/default.cfm
+	cp $CP_FLAGS $SHAREDIR/app.default.cfc $DIR/app/default.cfc
+	cp $CP_FLAGS $SHAREDIR/views.default.cfm $DIR/views/default.cfm
 	cp $CP_FLAGS $SHAREDIR/error.cfm $DIR/std/
-	cp $CP_FLAGS $SHAREDIR/model.cfc $DIR/std/base/
+	cp $CP_FLAGS $SHAREDIR/std.base.model.cfc $DIR/std/base/model.cfc
+	cp $CP_FLAGS $SHAREDIR/std.base.api.cfc $DIR/std/base/api.cfc
 	cp $CP_FLAGS $SHAREDIR/components.base.cfc $DIR/components/base.cfc
 	cp $CP_FLAGS $SHAREDIR/routes.base.cfc $DIR/routes/base.cfc
 	cp $CP_FLAGS $SHAREDIR/components/* $DIR/std/components/

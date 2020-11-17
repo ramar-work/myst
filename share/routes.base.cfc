@@ -5,15 +5,17 @@
  * @author
  * Antonio R. Collins II (ramar@collinsdesign.net)
  *
+ * @copyright
+ * Copyright 2016-Present, "Tubular Modular"
+ * Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+ *
  * @summary
- * Initialize the routes for a particular route
+ * Allow the routes map to be extended by other components. 
  * 
- * @todo
- * ...
  * ------------------------------------------------------ */
 component extends="std.base.model" {
 
-	//TODO: A lot of work may be needed to make this work the way I'd like
+	//TODO: Fix this
 	private boolean function serveStatic( myst, model ) {
 		var path = "files/#getNamespace()#/#route.active#";
 		return myst.serveStaticResource([], path, "File not found.");

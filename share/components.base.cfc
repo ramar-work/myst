@@ -1,19 +1,24 @@
-//base.cfc - should never actually be initialized, but serves as a template for all of the other components
+/* ---------------------------------------------- *
+base.cfc
+========
+
+@author
+Antonio R. Collins II (ramar@collinsdesign.net)
+
+@copyright
+Copyright 2016-Present, "Tubular Modular"
+Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+
+@summary
+This serves as the base for extensions to Myst.
+
+ * ---------------------------------------------- */
 component
 name="base"
 accessors="true"
 {
-	//The current Myst instance
-	property name="myst";
-
-	//The actual name of the component
-	property name="realname" type="string"; 
-
-	//The endpoint name used by the component
-	property name="namespace" type="string"; 
-
-	//Debuggable?
-	property name="debug" type="boolean" default=0; 
+	//Debuggable
+	property name="debug" type="boolean" default="false"; 
 
 	//Datasource used by a component
 	property name="datasource" type="string" default="";
@@ -21,32 +26,17 @@ accessors="true"
 	//Prefix for tables used by a component
 	property name="dbPrefix" type="string";
 
-	//Prefix for tables used by a component
-	property name="fileNotFoundError" type="string" default="";
+	//The current Myst instance
+	property name="myst";
 
-	//the reference function should probably be here for JS purposes...
-	public string function reference () {
-		//returns a JSON string with all of the API endpoints 
-		//(and possibly normal endpoints) used by the component	
-		//Find the routes file for the component in question (it's actual name)
-		return "";
-	}
+	//The endpoint name used by the component
+	property name="namespace" type="string"; 
 
-	//Run a setup function, should be accessible remotely to keep it easy
-	public string function setup () {
-		//put all of your component's setup scripts/files in here
+	//The actual name of the component
+	property name="realname" type="string"; 
 
-		//more than likely, the datasource needs to be changed to accept multiple queries.
-		//then you need to run any SQL statements
-		//not sure how hard find and replace is here
-		//now change the ddatabase back to it's original OR
-		//report any errors via a page
-
-		//TODO: Obviously, anyone being able to call this is a bad idea.
-		//A) try 'production mode', where in a user has to explicitly allow updates
-		//B) ...? 
-		return "";
-	}
+	//Allow the component to use its own routes
+	property name="routes" type="boolean" default="true";
 
 	//Return the full asset path w/o using link()	
 	public string function getAssetPath( required string type, required string file ) {
@@ -71,12 +61,7 @@ accessors="true"
 		return getPrivatePathAsStatic( route.active );
 	}
 
-	//Inject dependencies (setters should automatically be done)
-	//A dynamic property could be added within this method...
-	public void function inject () {}
-
-	//public function init ( required mystObject, string realname, string namespace, string dbPrefix, Boolean debuggable, Boolean showInitialization ) {
-	public function init ( required myst ) {
+	function init ( required myst ) {
 		//Always tell me what module this is
 		var c = getMetadata( this );
 

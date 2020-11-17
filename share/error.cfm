@@ -1,3 +1,4 @@
+<!--- error.cfm - Standard error page --->
 <html>
 <head>
 </head>
