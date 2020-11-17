@@ -33,9 +33,7 @@ component
 name="Myst" 
 accessors=true 
 {
-
-	//Cookie key name for grabbing stuff out of structs
-	property name="cookie" type="string" default="45d3b6e15e31a72dbdd0ac12672f397d5b9cd959cc348d16b716b2412880";
+	/* Public properties start here */
 
 	//Control debugging
 	property name="debug" type="boolean" default="false";
@@ -43,43 +41,48 @@ accessors=true
 	//The datasource that will be used during the life of the app.
 	property name="datasource" type="string";
 
-	//TODO: These are going to be DELETED in the near future
-	//Test mode
-	//property name="apiAutodie" type="boolean" default=1;
-	//Set post functions
-	//property name="postMap"; 
-	//Set pre functions
-	//property name="preMap"; 
-	//The current directory as Myst navigates through the framework directories.
-	//property name="currentDir" type="string"; 
+	//???
+	property name="model";
 
-	//TODO: These are going to be replaced in the near future
+	//???
+	property name="session" type="object";
+
+	/* END */
+
+
+	/* Private properties start here */
+
 	//The 'manifest' value that is loaded at the beginning of starting a Myst app
 	property name="appdata"; 
-
-	//TODO: Add these
-	//property name="toute" type="struct";
-
-	//TODO: leave these alone
-	//Set all http headers once at the top or something...
-	property name="httpHeaders" type="struct"; 
-
-	//The root directory
-	property name="rootDir" type="string"; 
 
 	//List of app folder names that should always be disallowed by an HTTP client
 	property name="arrayConstantMap" type="array"; //Make this a list?
 
+	//Relative path maps for framework directories
+	property name="constantMap" type="struct"; 
+
+	//Set all http headers once at the top or something...
+	property name="httpHeaders" type="struct"; 
+
 	//Choose a path seperator depending on system.
 	property name="pathSep" type="string" default="/";  
 
-	//Relative path maps for framework directories
-	property name="constantMap" type="struct"; 
+	//The root directory
+	property name="rootDir" type="string"; 
 
 	//Relative path maps for framework directories
 	property name="routingKeys" type="string"
 		default="before,after,accepts,expects,filter,returns,namespace";
 	//	default="before,after,accepts,expects,filter,returns,scope,wildcard,inherit";
+
+	//
+	property name="selectedContentType" type="string" default="text/html"; 
+
+	/* END */
+
+
+
+	/* DEPRECATE */
 
 	//Relative path maps for framework directories
 	property name="urlBase" type="string" default="/"; 
@@ -87,7 +90,6 @@ accessors=true
 	/*New as of 11/27*/
 	//Allow methods to reference the current content-type
 	//NOTE: An enum would be safer here, but you'll just want to use a custom setter...
-	property name="selectedContentType" type="string" default="text/html"; 
 	property name="contentOn404" type="string" default="File not found."; 
 	property name="contentOn410" type="string" default="Authentication denied."; 
 	property name="contentOn500" type="string" default="Error occurred."; 
@@ -120,29 +122,7 @@ accessors=true
 
 	property name="defaultContentType" type="string" default="text/html";
 
-	property name="model";
-
-	/*DEPRECATE THESE?*/
-	//Structs that might be loaded from elsewhere go here (and should really be done at startup)
-	property name="objects" type="struct";
-	property name="mimeToFileMap" type="struct"; 
-	property name="fileToMimeMap" type="struct"; 
-
-	//property name="pageScope" type="struct"; //setter=false getter=false;
-	variables.pageScope = {}; //setter=false getter=false;
-
-	//Defines a list of resources that we can reference without naming static resources
-	this.action  = {};
-
-	//Struct for pre and post functions when generating webpages
-	this.functions  = StructNew();
-
-	/*VARIABLES - None of these get a docblock. You really don't need to worry with these*/
-	this.logString = "";
-
-	this.dumpload = 1;
-
-
+	
 	/** DEBUGGING **
  * --------------------------------------------------------------------- */
 
@@ -1648,9 +1628,9 @@ abort;
 	/**
 	 * appendIndependentRoutes()
 	 *
-	 * 
+	 * Adds routes in routes/ and routes/overrides/ folders to the route map. 
 	 */
-	private Struct function appendIndependentRoutes ( data ) {
+	private Struct function appendIndependentRoutes ( data, ctx ) {
 		logReport("Loading independent routes...");
 
 		try {
@@ -1658,26 +1638,36 @@ abort;
 			var dirQuery = DirectoryList( "routes", false, "query", "*.cfc" );
 			var callstat = 0;
 			var routes = {};
+			var ctxc = ctx.components;
 
+			//Check for 
 			for ( var q in dirQuery ) {
-				//...
-				if ( q.name neq "Application.cfc" ) {
+				if ( q.name neq "Application.cfc" && q.name neq "base.cfc" ) {
+					var cmp;
 					var name = Replace( q.name, ".cfc", "" );
-					var comp = invokeComponent( "routes.#name#" );
-					if ( !comp.status )
-						return comp; //failure( "Route injection failed: #comp.message#", comp );
+					if ( StructKeyExists( ctxc, name ) && !ctxc[name].getRoutesEnabled() )
+						;
+					else if ( FileExists( "#getRootdir()#/routes/overrides/#q.name#" ) )
+						cmp = createObject( "routes.overrides.#name#" ).init( this );
 					else {
-						StructAppend( routes, comp.results ); 
+						cmp = createObject( "routes.#name#" ).init( this );
 					}
-				} 
+					StructAppend( routes, cmp ); 
+				}
 			}
 			logReport("SUCCESS - All routes loaded!");
-			return { status=true, results=routes };
+			return { 
+				status = true
+			, results = routes 
+			};
 		}
 		catch (any e) {
 			return failure( message="Route injection failed.", exception=e );
 		}
-		return { status=true, results={} };
+		return { 
+			status = true
+		, results = {} 
+		};
 	}
 
 
@@ -2246,6 +2236,14 @@ abort;
 		//Invoke this to load error handling
 		var error = new std.components.error( res, this );
 		setPageError( error );
+		
+		//Invoke this to load logging module
+		//var error = new std.components.error();
+		//setPageError( error );
+
+		//Invoke this to load session handler
+		setSession( new std.components.session() );
+		//variables.session = new std.components.session();
 
 		//Load the data component 
 		var appdata = loadAppDataComponent();
@@ -2304,7 +2302,7 @@ abort;
 			var rtable; 
 			var r;
 			//Route injection happens here.
-			if ( !( r = appendIndependentRoutes( appdata ) ).status )
+			if ( !( r = appendIndependentRoutes( appdata, ctx ) ).status )
 				return this.respondWith( 500, r );
 			else {
 				StructAppend( appdata.routes, r.results ); 
@@ -2748,10 +2746,11 @@ abort;
 
 
 	//Make HTTP requests in a saner fashion
-	public struct function httpRequest( required string apiUrl, required string method, struct payload, struct headers ) {
+	public struct function httpRequest( required string apiUrl, required string method, payload, struct headers ) {
 		//Define some headers
 		var fakeUa = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36";
 		var apiHeaders = {};
+		var completed;
 
 		try {
 			//Create a new request object
@@ -2776,17 +2775,19 @@ abort;
 
 			//Add the body fields
 			if ( StructKeyExists( arguments, "payload" ) ) {
-				//check between get and post (or pull them)
-				for ( var k in payload ) {
-					//TODO: if payload is a one-level deep struct, then don't worry about looping
-					//if it's deeper, then loop through each and continue adding the fields, but you have to 
-					//make sure that one is part of the body and the other is part of the url
-					http.addParam( type="formfield", name=LCase( k ), value=payload[k] );
+				var t = getType( arguments.payload );
+				if ( t.type neq "string" && t.type neq "struct" )
+					return failure( "Payload is of incorrect type.", e ); //500
+				else if ( t.type eq "string" )
+					http.addParam( type="body", value=arguments.payload );
+				else if ( t.type eq "struct" ) {
+					for ( var k in payload ) {
+						http.addParam( type="formfield", name=LCase( k ), value=payload[ k ] );
+					}
 				}
 			}
 
-			var h = http.send();
-			var p = h.getPrefix();
+			completed = http.send().getPrefix();
 		}
 		catch (any e) {
 			return failure( "Failure to perform HTTP '#method#' on URL '#apiURL#'", e );
@@ -2796,8 +2797,8 @@ abort;
 		return {
 			status = true
 		, message = "Successfully performed HTTP #method# on URL '#apiURL#'" 
-		, results = p.fileContent 
-		, extra = p
+		, results = completed.fileContent 
+		, extra = completed 
 		};
 	}
 
