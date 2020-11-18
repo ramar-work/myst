@@ -1,7 +1,18 @@
-component 
-name="response"
-accessors="true"
-{
+/* ---------------------------------------------- *
+ * response.cfc
+ * ============
+ * 
+ * @author
+ * Antonio R. Collins II (ramar@collinsdesign.net)
+ * 
+ * @copyright
+ * 2016 - Present, Tubular Modular Inc dba Collins Design
+ * 
+ * @summary
+ * Handles generating responses. 
+ * 
+ * ---------------------------------------------- */
+component accessors="true" {
 	
 	property name="headers" type="array";
 
@@ -24,7 +35,7 @@ accessors="true"
 	 * Send a binary response.
 	 *
 	 */
-	public boolean function sendBinaryResponse(Required numeric s, Required string m, required numeric size, required c) {
+	public boolean function sendBinary(Required numeric s, Required string m, required numeric size, required c) {
 		var q = getPageContext().getResponse();
 		var r = getPageContext().getResponseStream();
 		//You can optionally make a bytestream here
@@ -45,11 +56,11 @@ accessors="true"
 		r.setStatus( s, getHttpHeaders()[ s ] );
 		r.setContentType( m );
 		w.print( c );
-		w.flush(); //this is a function... thing needs to shut de fuk up
+		w.flush();
 		*/
 		var r = getPageContext().getResponse();
 		var w = r.getWriter();
-		r.setStatus( s, getHttpHeaders()[ s ] );
+		r.setStatus( s, myst.getHeaders()[ s ] );
 		r.setContentType( m );
 		w.print( c );
 		w.flush();
@@ -57,7 +68,8 @@ accessors="true"
 		return true;
 	}
 
-	function init() {
+	function init( myst ) {
+		variables.myst = myst; 
 		return this;
 	}
 

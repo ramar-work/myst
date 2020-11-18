@@ -1,1 +1,0 @@
-/* router.cfc - Handles routing */

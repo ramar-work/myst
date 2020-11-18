@@ -1,15 +1,40 @@
-/*log.cfc*/
-component
-name="log" 
-{
-	property name="device";
+/* ---------------------------------------------- *
+ * log.cfc
+ * =======
+ * 
+ * @author
+ * Antonio R. Collins II (ramar@collinsdesign.net)
+ * 
+ * @copyright
+ * 2016 - Present, Tubular Modular Inc dba Collins Design
+ * 
+ * @summary
+ * Handles logging.
+ * 
+ * ---------------------------------------------- */
+component extends="base" {
+
+	//Directory to use when writing to file.
+	property name="directory" type="string" default="log.txt";
+
+	//Where the file should be written out
 	property name="file" type="string" default="log.txt";
-	property name="style" type="string" default="standard";
+
+	//...
 	property name="format" type="string" default="EEEE mmmm d, yyyy HH:NN:SS tt";
-	property name="runId" type="string" default="000111000";
+
+	//...
+	property name="runId" type="string"; 
+
+	//...
+	property name="style" type="string" default="standard";
+
+	//Choose either db logging, plaintext logging or custom logging through a function
+	property name="type" type="string" default="plaintext";
+
 
 	/**
-	 * format
+	 * Write out log to file using $format mask
  	 *
 	 **/
 	private string function format( required string message ) {
@@ -18,13 +43,13 @@ name="log"
 		return "#id#: [#d# EST] #arguments.message#" & Chr(10) & Chr(13);
 	}
 
+
 	/** 
-	 * logReport
+	 * Perform logging.
 	 *
-	 * Will silently log as Myst executes
-	 * This is mostly for debugging.
+	 * @param message        String message to write to log.
 	 */
-	public void function report ( Required String message ) {
+	public void function report( required String message ) {
 		try {
 			if ( getLogStyle() eq "standard" ) { 
 				//Do a verbose log

@@ -1,14 +1,26 @@
-/* html.cfc - Handles basic HTML functions in views */
-component {
+/* ---------------------------------------------- *
+ * html.cfc
+ * ========
+ * 
+ * @author
+ * Antonio R. Collins II (ramar@collinsdesign.net)
+ * 
+ * @copyright
+ * 2016 - Present, Tubular Modular Inc dba Collins Design
+ * 
+ * @summary
+ * Handles generating basic structures for common 
+ * elements in HTML.
+ * 
+ * ---------------------------------------------- */
+component extends="base" {
 
 	/**
-	 * crumbs( ... )
-	 *
 	 * Create "breadcrumb" link for really deep pages within a webapp. 
 	 *
+	 * @param links       A set of links.
 	 */
 	public function crumbs ( array links ) {
-		throw "EXPERIMENTAL";
 		var a = ListToArray(cgi.path_info, "/");
 		//writedump (a);
 		/*Retrieve, list and something else needs breadcrumbs*/
@@ -20,12 +32,36 @@ component {
 
 
 	/**
-	 * href( ... )
+	 * Generate navigation.
 	 *
+	 * @param items     ...
+	 */
+	public array function generateNav( required items ) {
+		var t = myst.getType( items );
+		//if it's not an array, struct or query, die
+		if ( t.type neq "struct" && t.type neq "array" && t.type neq "string" ) {
+			//throw new Exception( 'items were not an array or struct." );
+			return [];
+		}
+
+		if ( t.type eq "string" ) {
+			items = ListToArray( items, "," );		
+		}
+		
+		var links = [];
+		for ( var i in items ) {
+			//ArrayAppend( links, { href=myst.link( "#baseurl#/#i#" ), name=i } );	
+			ArrayAppend( links, { href="#baseurl#/#i#", name=i } );	
+		}
+		return links;
+	}
+
+
+	/**
 	 * Generate links relative to the current application and its basedir if it
 	 * exists.
 	 *
-	 * TODO: Should be in an HTML component
+	 * @param str        ...
 	 */
 	public string function href( string str ) {
 		//Define spot for link text
@@ -59,5 +95,9 @@ component {
 			}
 		}
 		return linkText;
+	}
+
+	function init() {
+		return this;
 	}
 }

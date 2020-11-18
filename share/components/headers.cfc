@@ -1,6 +1,6 @@
 /* httpHeaders.cfc */
 component name="headers" {
-	struct function init() {
+	function getHeaders() {
 		return {
 			//1×× Informational
 			 "100" = "Continue"
@@ -71,5 +71,9 @@ component name="headers" {
 			,"511" = "Network Authentication Required"
 			,"599" = "Network Connect Timeout Error"
 		}
+	}
+
+	function init() {
+		return getHeaders();
 	}
 }

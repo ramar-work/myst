@@ -1,6 +1,20 @@
-/*error.cfc - Deals with handling errors*/
+/* ---------------------------------------------- *
+ * error.cfc
+ * =========
+ * 
+ * @author
+ * Antonio R. Collins II (ramar@collinsdesign.net)
+ * 
+ * @copyright
+ * 2016 - Present, Tubular Modular Inc dba Collins Design
+ * 
+ * @summary
+ * Methods for dealing with errors.
+ * 
+ * ---------------------------------------------- */
 component 
 name="error"
+extends="base"
 accessors=true
 {
 	property name="status" type="numeric"; 
@@ -23,9 +37,7 @@ accessors=true
 
 	property name="errorDump" type="string"; 
 
-	//Dependencies
 	property name="response" type="object"; 
-	property name="framework" type="object"; 
 
 	//Takes a structure as an argument and breaks it down
 	public void function explode( struct error ) {
@@ -60,15 +72,14 @@ accessors=true
 	//Handles rendering error messages according to the type of content
 	public string function render( struct error ) {
 		this.explode( error );
-		//
-		if ( this.response.getContentType() == "application/json" ) {
+		var res = myst.getResponse();
+		if ( res.getContentType() == "application/json" )
 			return SerializeJSON( this.serialize() ); 
-		}
-		else if ( this.response.getContentType() == "text/xml" )
+		else if ( res.getContentType() == "text/xml" )
 			return SerializeXML( this.serialize() ); 
 		else {
 			//Include an error handler file
-			fwResults = this.framework._include( "std", this.getErrorHandler() );
+			fwResults = myst._include( "std", this.getErrorHandler() );
 			if ( fwResults.status )
 				return fwResults.results;					
 			else {
@@ -82,9 +93,8 @@ accessors=true
 		}	
 	}
 
-	function init( response, myst ) {
-		this.response = response;
-		this.framework = myst;
+	function init( myst ) {
+		variables.myst = myst;
 		return this;
 	}
 }

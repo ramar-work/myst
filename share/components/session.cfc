@@ -1,10 +1,30 @@
-/*session.cfc*/
-component name="session" {
+/* ---------------------------------------------- *
+ * session.cfc
+ * ===========
+ * 
+ * @author
+ * Antonio R. Collins II (ramar@collinsdesign.net)
+ * 
+ * @copyright
+ * 2016 - Present, Tubular Modular Inc dba Collins Design
+ * 
+ * @summary
+ * Methods for dealing with sessions.
+ * 
+ * ---------------------------------------------- */
+component name="session" extends="base" {
 
-	property name="keys" type="string"; //or list
+	//FUTURE: what does this do?
+	property name="keys" type="string";
 
-	property name="name" type="string"; //or list
+	//FUTURE: what does this do?
+	property name="name" type="string"; 
 
+	/**
+	 * Check for a specific key 
+	 *
+	 * @param obj   ....
+	 */
 	public boolean function check( struct obj ) {
 		return StructKeyExists( session, "quickcart_token" );
 		/*
@@ -25,7 +45,11 @@ component name="session" {
 		*/
 	}
 
-//delete a session anonymously in a cart
+	/**
+	 * Get a key
+	 *
+	 * @param obj   ....
+	 */
 	public string function key( struct obj ) {
 		return ( StructKeyExists( session, "quickcart_token" ) ) ? session.quickcart_token : '';
 		/*
@@ -40,7 +64,11 @@ component name="session" {
 		*/
 	}	
 
-//delete a session anonymously in a cart
+	/**
+	 * delete a session anonymously in a cart
+	 *
+	 * @param obj   ....
+	 */
 	public boolean function destroy() {
 		var status = true;
 		try {
@@ -66,7 +94,11 @@ component name="session" {
 	}
 
 
-//start a session anonymously in a cart
+	/**
+	 * start a session anonymously in a cart
+	 *
+	 * @param obj   ....
+	 */
 	public boolean function start() {
 		var status = true;
 		try {
@@ -90,6 +122,7 @@ component name="session" {
 		}
 		return true;
 	}
+
 
 	function init() {
 		return this;
