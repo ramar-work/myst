@@ -81,12 +81,12 @@ $PROGRAM_NAME:
 -r, --remove <arg>      Remove a datasource within Lucee.
 -n, --name <arg>        Datasource will have name <arg>
 -u, --user <arg>        Use this user name with the new data source.
-    --password <arg>    Use this password with the new data source.
+-p, --password <arg>    Use this password with the new data source.
 -l, --list              List all datasources
 -k, --check <arg>       Check that a particular datasource exists
     --max-conn <arg>    How many connections should the new data source be able to take?
     --remote <arg>      The location of a remote server that this should attach to.
--p, --postgres          Assume the source is a PostgreSQL data source.
+    --postgres          Assume the source is a PostgreSQL data source.
 -m, --mysql             Assume the source is a MySQL data source.
 -s, --mssql             Assume the source is a Microsoft SQL server data source.
     --global            Create the datasource globally versus in one locked down context.
@@ -234,7 +234,7 @@ do
 			DB_USER="$1"
 		;;
 
-		--password)	
+		-p|--password)	
 			CODE=`detFlag "$2"`;
 			test $CODE -lt 1 && err "$1 needs an argument, got '${2:-(nil)}'. Exiting..." 1
 			shift
@@ -263,7 +263,7 @@ do
 		-l|--list)	
 			DO_LIST=1
 		;;
-		-p|--postgres)	
+		--postgres)	
 			DO_PGSQL=1
 		;;
 		-m|--mysql)	
