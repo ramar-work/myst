@@ -64,7 +64,7 @@ accessors="true" {
 	function init( myst ) {
 		variables.myst = myst;
 		variables.route = {}
-		variables.components = myst.getContext().components;
+		variables.components = myst.getContext().getComponents();
 		
 		//Initialize extensions to router
 		if ( StructKeyExists( myst.getContext(), "route" ) ) { 

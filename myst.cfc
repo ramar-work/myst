@@ -113,7 +113,7 @@ component accessors="true" {
 	property name="index" type="string" default="_";
 
 	//Base components to load
-	property name="base" type="list" default="ctx,error,evaluate,file,headers,log,mime,response,rand" setter="false";
+	property name="base" type="list" default="ctx,error,file,headers,log,mime,response,rand" setter="false";
 
 	//Track the current context for use elsewhere
 	property name="context" type="object";
@@ -1473,6 +1473,7 @@ component accessors="true" {
 			return this.respondWith( 500, variables.components );
 		else {
 			variables.components = variables.components.results;
+			ctx.setComponents( variables.components );
 		}
 
 		//This ought to return a machine code friendly struct with route eval data
