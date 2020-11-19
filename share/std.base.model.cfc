@@ -19,9 +19,6 @@ accessors="true" {
 	//List of dependencies needed by this model
 	property name="dependencies" type="list" default="";
 
-	//FUTURE: Specify a base directory for multiple dependencies in the same place.
-	property name="dependencyBaseDir" type="string" default="";
-
 	/** 
 	 * Return an appropriate scope per received method.
 	 *
