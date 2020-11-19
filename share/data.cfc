@@ -9,11 +9,14 @@
  * properties.
  * ------------------------------------------- */
 component extends="std.base.data" accessors="true" {
+	//Set a primary author for SEO purposes
+	property name="author" type="string" default="__AUTHOR__";
+
 	//Set a description for this new application
 	property name="description" type="string" default="__DESCRIPTION__";
 
-	//Set a primary author for SEO purposes
-	property name="author" type="string" default="__AUTHOR__";
+	//Set a symbolic name to identify this site on a server. 
+	property name="name" type="string" default="__NAME__";
 
 	//Select a datasource
 	property name="source" type="string" default="__DATASOURCE__";

@@ -3,7 +3,7 @@
  * --------
  * 
  * @summary
- * Example CFML-based configuration file. 
+ * Example component-based configuration file. 
  * Application routes, datasources and more are 
  * all updated here.
  * ------------------------------------------- */
@@ -34,10 +34,10 @@ component accessors="true" {
 	property name="base" type="string" default="/";
 
 	//This is a symbolic name for the application
-	property name="name" type="string" default="city.local";
+	property name="name" type="string" default="";
 
 	//Set a global site title from here for SEO purposes
-	property name="title" type="string" default="city.local";
+	property name="title" type="string" default="";
 
 	//Choose a default 404 page
 	property name="404" type="string" default="";

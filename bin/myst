@@ -82,6 +82,7 @@ Instance options:
 -s, --datasource <arg>   Specify a default datasource for use with the new instance.
     --finalize <arg>     Finalize a Myst instance.
 -l, --list               List all the hosts and their status.
+-c, --check              Check Apache configuration.
 
 Modifiers and server-specific options:
 -i, --virtual-host <arg> Create a \$SERVER-style virtual host and an .htaccess file.
@@ -240,7 +241,7 @@ do
 		;;
 
 		# Test bundled Apache server config
-		--test)
+		--check)
 			DO_APACHE_TEST=1
 		;;
 
@@ -438,14 +439,14 @@ EOF
 
 
 	# If we're on an Apple system, the sed commands will have to be different.
+	#s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;;
+	#s;__BASE__;${BASEDIR:-"/"};;
 	sed -i -e "{
 		s/__DATASOURCE__/${DATASOURCE}/;
-		s;__COOKIE__;`xxd -ps -l 60 /dev/urandom | head -n 1`;;
-		s;__BASE__;${BASEDIR:-"/"};;
 		s/__NAME__/${NAME:-"anon"}/;
 		s/__AUTHOR__/${AUTHOR:-"Buddy Noone"}/;
 		s/__TITLE__/${TITLE:-"Titleless Website"}/;
-	}" $DIR/data.cfm
+	}" $DIR/data.cfc
 	[ $VERBOSE -eq 1 ] && echo DONE!
 
 
