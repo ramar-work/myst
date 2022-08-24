@@ -1,6 +1,11 @@
 myst 
 ====
 
+## NOTE 
+
+This project is no more.   I am no longer writing anything in Lucee or Coldfusion.   Additionally, this framework was replaced by an engine called <a href="https://github.com/ramar-work/hypno">Hypno</a> building upon many of the good ideas formulated here.  You might like it.  If I were you, I'd check it out.  Seriously.
+
+
 Summary
 -------
 

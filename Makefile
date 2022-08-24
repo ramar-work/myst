@@ -1,6 +1,7 @@
 # myst - Makefile last updated: 
 NAME=myst
-PREFIX=/opt/$(NAME)
+#PREFIX=/opt/$(NAME)
+PREFIX=/home/ramar/myst
 LP=./tmp/myst
 SHAREDIR=$(PREFIX)/share
 MANDIR=${PREFIX}/share/man
@@ -13,8 +14,8 @@ FORCE_INSTALL=0
 #LUCEE_PREFIX=$(PREFIX)/$(NAME)2
 
 #Unix centric things here
-USER=http
-GROUP=http
+USER=ramar
+GROUP=ramar
 PASS=myst
 SYSTEMD_LIBDIR=/usr/lib/systemd/system
 
