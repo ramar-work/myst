@@ -3,28 +3,27 @@ myst
 
 ## NOTE 
 
-This project is no more.   I am no longer writing anything in Lucee or Coldfusion.   Additionally, this framework was replaced by an engine called <a href="https://github.com/ramar-work/hypno">Hypno</a> building upon many of the good ideas formulated here.  You might like it.  If I were you, I'd check it out.  Seriously.
+This project has been sunset, as I rarely write anything in Lucee or Coldfusion these days.   This framework was replaced by an engine called <a href="https://github.com/ramar-work/hypno">Hypno</a> which uses Lua for business logic and builts upon many of the ideas formulated here in Myst.  You might like it.  If I were you, I'd check it out.  Seriously.
 
 
 Summary
 -------
 
 Myst is a web framework for CFML based webservers such as ColdFusion and Lucee.  
-The intent is to facilitate the adoption of model-view-controller based web development for ColdFusion applications, making it trivial to enforce seperation of concerns and create maintainable ColdFusion codebases.
-
+The intent of this application is to facilitate the adoption of model-view-controller based web development for ColdFusion applications.  This helps enforce seperation of concerns and greatly helps maintenance of applications written in ColdFusion.
 
 Installation
 ------------
 
 <!-- Myst can be downloaded via its <a href="http://mystframework.com">home page</a> -->
-Myst can be downloaded via Github at <a href="https://github.com/zaiah-dj/myst">https://github.com/zaiah-dj/myst</a>.  You can clone the latest version by using the following on your system:
+Myst can be downloaded via Github at <a href="https://github.com/ramar-work/myst">https://github.com/ramar-work/myst</a>.  You can clone the latest version by using the following on your system:
 
 NOTE: These instructions are best executed on a Linux machine (Arch or Ubuntu are preferable.)
 
 1. If you are on Linux, go to your home directory and grab the latest copy.
 	<pre>
 	$ cd ~
-	$ git clone https://github.com/zaiah-dj/myst.git
+	$ git clone https://github.com/ramar-work/myst.git
 	</pre>
 	
 	If you do not have git installed, you may also download directly from the home page. 
@@ -56,7 +55,7 @@ NOTE: These instructions are best executed on a Linux machine (Arch or Ubuntu ar
 
 Myst only builds on Linux for now.  
 
-OSX is as yet untested, and users may run into issues with Lucee. 
+OSX is as yet untested, and users may run into general issues with Lucee. 
 
 Windows is also untested, but Cygwin users may be in good shape.
 
