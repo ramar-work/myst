@@ -1,11 +1,6 @@
 myst 
 ====
 
-## NOTE 
-
-This project has been sunset, as I rarely write anything in Lucee or Coldfusion these days.   This framework was replaced by an engine called <a href="https://github.com/ramar-work/hypno">Hypno</a> which uses Lua for business logic and builts upon many of the ideas formulated here in Myst.  You might like it.  If I were you, I'd check it out.  Seriously.
-
-
 Summary
 -------
 
